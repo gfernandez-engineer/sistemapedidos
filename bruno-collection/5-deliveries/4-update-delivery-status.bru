@@ -1,0 +1,17 @@
+meta {
+  name: 4. Update Delivery Status
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{deliveries_url}}/api/v1/deliveries/{{delivery_id}}/status
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "status": "PICKED_UP"
+  }
+}

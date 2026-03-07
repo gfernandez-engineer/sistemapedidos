@@ -1,0 +1,29 @@
+meta {
+  name: 1. Register User
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{users_url}}/api/v1/users
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "juan.perez@email.com",
+    "password": "SecurePass123!",
+    "firstName": "Juan",
+    "lastName": "Perez",
+    "phone": "+56912345678",
+    "address": "Av. Providencia 1234, Santiago",
+    "role": "CUSTOMER"
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar("user_id", res.body.id);
+  }
+}

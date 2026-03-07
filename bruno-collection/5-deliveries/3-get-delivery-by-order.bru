@@ -1,0 +1,10 @@
+meta {
+  name: 3. Get Delivery by Order ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{deliveries_url}}/api/v1/deliveries/order/{{order_id}}
+  auth: none
+}

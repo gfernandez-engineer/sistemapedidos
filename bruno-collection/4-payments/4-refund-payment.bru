@@ -1,0 +1,10 @@
+meta {
+  name: 4. Refund Payment
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{payments_url}}/api/v1/payments/{{payment_id}}/refund
+  auth: none
+}

@@ -1,0 +1,10 @@
+meta {
+  name: 2. Get Payment by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{payments_url}}/api/v1/payments/{{payment_id}}
+  auth: none
+}

@@ -1,0 +1,10 @@
+meta {
+  name: 9. Toggle Product Availability
+  type: http
+  seq: 9
+}
+
+patch {
+  url: {{catalog_url}}/api/v1/products/{{product_id}}/availability
+  auth: none
+}

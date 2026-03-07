@@ -1,0 +1,20 @@
+meta {
+  name: 4. Update User
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{users_url}}/api/v1/users/{{user_id}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "firstName": "Juan Carlos",
+    "lastName": "Perez Lopez",
+    "phone": "+56987654321",
+    "address": "Av. Las Condes 5678, Santiago"
+  }
+}

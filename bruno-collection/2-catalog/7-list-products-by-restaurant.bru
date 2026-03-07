@@ -1,0 +1,10 @@
+meta {
+  name: 7. List Products by Restaurant
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{catalog_url}}/api/v1/restaurants/{{restaurant_id}}/products
+  auth: none
+}

@@ -1,0 +1,10 @@
+meta {
+  name: 3. List Restaurants (paginated)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{catalog_url}}/api/v1/restaurants?page=0&size=10&sort=name
+  auth: none
+}

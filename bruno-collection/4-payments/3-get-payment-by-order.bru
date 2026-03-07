@@ -1,0 +1,10 @@
+meta {
+  name: 3. Get Payment by Order ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{payments_url}}/api/v1/payments/order/{{order_id}}
+  auth: none
+}

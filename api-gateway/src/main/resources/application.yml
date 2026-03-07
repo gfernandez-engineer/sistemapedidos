@@ -1,0 +1,85 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: users-service
+          uri: ${USERS_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/users/**
+        - id: orders-service
+          uri: ${ORDERS_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/orders/**
+        - id: catalog-restaurants
+          uri: ${CATALOG_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/restaurants/**
+        - id: catalog-products
+          uri: ${CATALOG_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/products/**
+        - id: payments-service
+          uri: ${PAYMENTS_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/payments/**
+        - id: deliveries-service
+          uri: ${DELIVERIES_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/v1/deliveries/**
+        - id: drivers-service
+          uri: ${DELIVERIES_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/v1/drivers/**
+        # Swagger UI routes
+        - id: users-swagger
+          uri: ${USERS_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/users/swagger-ui/**,/users/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: orders-swagger
+          uri: ${ORDERS_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/orders/swagger-ui/**,/orders/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: catalog-swagger
+          uri: ${CATALOG_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/catalog/swagger-ui/**,/catalog/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: payments-swagger
+          uri: ${PAYMENTS_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/payments/swagger-ui/**,/payments/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: deliveries-swagger
+          uri: ${DELIVERIES_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/deliveries/swagger-ui/**,/deliveries/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,gateway
+  endpoint:
+    gateway:
+      enabled: true

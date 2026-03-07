@@ -1,0 +1,27 @@
+meta {
+  name: 5. Create Product
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{catalog_url}}/api/v1/restaurants/{{restaurant_id}}/products
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Salmon Roll x8",
+    "description": "8 piezas de roll de salmon fresco con palta y queso crema",
+    "price": 12990,
+    "category": "ROLLS",
+    "imageUrl": "https://example.com/images/salmon-roll.jpg"
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar("product_id", res.body.id);
+  }
+}

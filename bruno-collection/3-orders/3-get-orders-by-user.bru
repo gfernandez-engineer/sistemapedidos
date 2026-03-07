@@ -1,0 +1,10 @@
+meta {
+  name: 3. Get Orders by User
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{orders_url}}/api/v1/orders/user/{{user_id}}
+  auth: none
+}

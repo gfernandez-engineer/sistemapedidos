@@ -1,0 +1,21 @@
+meta {
+  name: 8. Update Product
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{catalog_url}}/api/v1/products/{{product_id}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Salmon Roll Premium x8",
+    "description": "8 piezas de roll de salmon premium con palta y queso crema",
+    "price": 14990,
+    "category": "ROLLS",
+    "imageUrl": "https://example.com/images/salmon-roll-premium.jpg"
+  }
+}

@@ -1,0 +1,10 @@
+meta {
+  name: 3. Toggle Driver Availability
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{deliveries_url}}/api/v1/drivers/{{driver_id}}/availability
+  auth: none
+}
