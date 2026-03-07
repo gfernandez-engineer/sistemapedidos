@@ -1,0 +1,26 @@
+apiVersion: v2
+name: food-ordering-system
+description: Sistema de Pedidos de Comida - Microservicios
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: users-service
+    version: 1.0.0
+    condition: users-service.enabled
+  - name: orders-service
+    version: 1.0.0
+    condition: orders-service.enabled
+  - name: catalog-service
+    version: 1.0.0
+    condition: catalog-service.enabled
+  - name: payments-service
+    version: 1.0.0
+    condition: payments-service.enabled
+  - name: deliveries-service
+    version: 1.0.0
+    condition: deliveries-service.enabled
+  - name: api-gateway
+    version: 1.0.0
+    condition: api-gateway.enabled

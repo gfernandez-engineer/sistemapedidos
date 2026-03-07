@@ -1,0 +1,170 @@
+# Global values shared across all subcharts
+global:
+  namespace: food-ordering
+  imageRegistry: food-ordering
+  imagePullPolicy: IfNotPresent
+  kafka:
+    bootstrapServers: kafka:9092
+  jwt:
+    issuerUri: http://keycloak:8080/realms/food-ordering
+
+# Subchart toggles
+users-service:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: food-ordering/users-service
+    tag: latest
+  service:
+    port: 8081
+  database:
+    host: users-db
+    port: 5432
+    name: users_db
+    secretName: users-db-secret
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPU: 70
+
+orders-service:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: food-ordering/orders-service
+    tag: latest
+  service:
+    port: 8082
+  database:
+    host: orders-db
+    port: 5432
+    name: orders_db
+    secretName: orders-db-secret
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPU: 70
+
+catalog-service:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: food-ordering/catalog-service
+    tag: latest
+  service:
+    port: 8083
+  database:
+    host: catalog-db
+    port: 5432
+    name: catalog_db
+    secretName: catalog-db-secret
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPU: 70
+
+payments-service:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: food-ordering/payments-service
+    tag: latest
+  service:
+    port: 8084
+  database:
+    host: payments-db
+    port: 5432
+    name: payments_db
+    secretName: payments-db-secret
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPU: 70
+
+deliveries-service:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: food-ordering/deliveries-service
+    tag: latest
+  service:
+    port: 8085
+  database:
+    host: deliveries-db
+    port: 5432
+    name: deliveries_db
+    secretName: deliveries-db-secret
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPU: 70
+
+api-gateway:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: food-ordering/api-gateway
+    tag: latest
+  service:
+    port: 8080
+    type: LoadBalancer
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPU: 70
+
+ingress:
+  enabled: true
+  className: nginx
+  host: api.food-ordering.local
+  annotations:
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"

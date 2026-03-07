@@ -1,0 +1,74 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: food-ordering-ingress
+  namespace: {{ include "food-ordering.namespace" . }}
+  labels:
+    {{- include "food-ordering.labels" . | nindent 4 }}
+  annotations:
+    {{- range $key, $value := .Values.ingress.annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if and .Values.ingress.tls .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /api/v1/users
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-users-service
+                port:
+                  number: {{ .Values.users_service.service.port | default 8081 }}
+          - path: /api/v1/orders
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-orders-service
+                port:
+                  number: {{ .Values.orders_service.service.port | default 8082 }}
+          - path: /api/v1/restaurants
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-catalog-service
+                port:
+                  number: {{ .Values.catalog_service.service.port | default 8083 }}
+          - path: /api/v1/products
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-catalog-service
+                port:
+                  number: {{ .Values.catalog_service.service.port | default 8083 }}
+          - path: /api/v1/payments
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-payments-service
+                port:
+                  number: {{ .Values.payments_service.service.port | default 8084 }}
+          - path: /api/v1/deliveries
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-deliveries-service
+                port:
+                  number: {{ .Values.deliveries_service.service.port | default 8085 }}
+          - path: /api/v1/drivers
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-deliveries-service
+                port:
+                  number: {{ .Values.deliveries_service.service.port | default 8085 }}
+{{- end }}

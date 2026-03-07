@@ -1,0 +1,43 @@
+# Staging environment overrides
+global:
+  namespace: food-ordering-staging
+  imagePullPolicy: Always
+
+users-service:
+  replicaCount: 2
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+
+orders-service:
+  replicaCount: 2
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+
+catalog-service:
+  replicaCount: 2
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+
+payments-service:
+  replicaCount: 2
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+
+deliveries-service:
+  replicaCount: 2
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+
+api-gateway:
+  replicaCount: 2
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+
+ingress:
+  host: api.food-ordering-staging.local

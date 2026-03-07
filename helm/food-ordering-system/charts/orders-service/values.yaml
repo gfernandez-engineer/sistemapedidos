@@ -1,0 +1,21 @@
+replicaCount: 2
+image:
+  repository: food-ordering/orders-service
+  tag: latest
+service:
+  port: 8082
+  type: ClusterIP
+database:
+  secretName: orders-db-secret
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPU: 70

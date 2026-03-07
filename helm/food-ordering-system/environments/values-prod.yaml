@@ -1,0 +1,98 @@
+# Production environment overrides
+global:
+  namespace: food-ordering-prod
+  imagePullPolicy: IfNotPresent
+
+users-service:
+  replicaCount: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPU: 60
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+orders-service:
+  replicaCount: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPU: 60
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+catalog-service:
+  replicaCount: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPU: 60
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+payments-service:
+  replicaCount: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPU: 60
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+deliveries-service:
+  replicaCount: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPU: 60
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+api-gateway:
+  replicaCount: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPU: 60
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+ingress:
+  host: api.food-ordering.com
+  annotations:
+    nginx.ingress.kubernetes.io/rate-limit: "500"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: food-ordering-tls

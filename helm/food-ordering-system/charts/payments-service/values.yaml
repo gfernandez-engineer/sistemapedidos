@@ -1,0 +1,21 @@
+replicaCount: 2
+image:
+  repository: food-ordering/payments-service
+  tag: latest
+service:
+  port: 8084
+  type: ClusterIP
+database:
+  secretName: payments-db-secret
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "250m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPU: 70

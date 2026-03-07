@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "api-gateway.fullname" . }}
+  namespace: {{ .Values.global.namespace | default "food-ordering" }}
+  labels:
+    {{- include "api-gateway.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "api-gateway.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "api-gateway.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: api-gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          env:
+            - name: USERS_SERVICE_URL
+              value: http://{{ .Release.Name }}-users-service:8081
+            - name: ORDERS_SERVICE_URL
+              value: http://{{ .Release.Name }}-orders-service:8082
+            - name: CATALOG_SERVICE_URL
+              value: http://{{ .Release.Name }}-catalog-service:8083
+            - name: PAYMENTS_SERVICE_URL
+              value: http://{{ .Release.Name }}-payments-service:8084
+            - name: DELIVERIES_SERVICE_URL
+              value: http://{{ .Release.Name }}-deliveries-service:8085
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 40
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

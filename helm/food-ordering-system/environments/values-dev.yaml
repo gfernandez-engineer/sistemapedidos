@@ -1,0 +1,79 @@
+# Development environment overrides
+global:
+  namespace: food-ordering-dev
+  imagePullPolicy: Always
+
+users-service:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+orders-service:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+catalog-service:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+payments-service:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+deliveries-service:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+api-gateway:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+ingress:
+  enabled: false
