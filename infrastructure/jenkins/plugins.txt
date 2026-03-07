@@ -1,0 +1,12 @@
+workflow-aggregator
+git
+github
+github-branch-source
+pipeline-github-lib
+pipeline-stage-view
+junit
+credentials-binding
+timestamper
+ws-cleanup
+docker-workflow
+dark-theme

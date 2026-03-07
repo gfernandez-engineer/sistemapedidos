@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  jenkins:
+    build: .
+    container_name: jenkins-local
+    ports:
+      - "9090:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins-data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - JENKINS_ADMIN_ID=admin
+      - JENKINS_ADMIN_PASSWORD=admin
+    restart: unless-stopped
+
+volumes:
+  jenkins-data:
