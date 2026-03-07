@@ -16,64 +16,14 @@ pipeline {
             }
         }
 
-        stage('Build Common Module') {
+        stage('Build & Test') {
             steps {
-                dir('common') {
-                    sh 'mvn clean install -DskipTests -B'
-                }
+                sh 'mvn clean verify -B'
             }
-        }
-
-        stage('Build & Test Services') {
-            parallel {
-                stage('Users Service') {
-                    steps {
-                        dir('users-service') {
-                            sh 'mvn clean verify -B'
-                        }
-                    }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
                 }
-                stage('Orders Service') {
-                    steps {
-                        dir('orders-service') {
-                            sh 'mvn clean verify -B'
-                        }
-                    }
-                }
-                stage('Catalog Service') {
-                    steps {
-                        dir('catalog-service') {
-                            sh 'mvn clean verify -B'
-                        }
-                    }
-                }
-                stage('Payments Service') {
-                    steps {
-                        dir('payments-service') {
-                            sh 'mvn clean verify -B'
-                        }
-                    }
-                }
-                stage('Deliveries Service') {
-                    steps {
-                        dir('deliveries-service') {
-                            sh 'mvn clean verify -B'
-                        }
-                    }
-                }
-                stage('API Gateway') {
-                    steps {
-                        dir('api-gateway') {
-                            sh 'mvn clean verify -B'
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Test Reports') {
-            steps {
-                junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
             }
         }
 
