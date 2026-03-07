@@ -4,17 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.food.ordering.catalog.application.port.input.ManageRestaurantUseCase;
 import com.food.ordering.catalog.application.port.input.ManageRestaurantUseCase.RestaurantResponse;
 import com.food.ordering.catalog.infrastructure.adapter.input.rest.dto.CreateRestaurantRequest;
-import com.food.ordering.catalog.infrastructure.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -27,8 +26,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(RestaurantController.class)
-@Import(SecurityConfig.class)
+@WebMvcTest(value = RestaurantController.class, excludeAutoConfiguration = OAuth2ResourceServerAutoConfiguration.class)
+@AutoConfigureMockMvc(addFilters = false)
 class RestaurantControllerTest {
 
     @Autowired
@@ -71,7 +70,7 @@ class RestaurantControllerTest {
     }
 
     @Test
-    @WithMockUser
+
     void shouldCreateRestaurant() throws Exception {
         CreateRestaurantRequest request = new CreateRestaurantRequest(
                 "Pizza Palace", "Best pizza", "123 Main St",

@@ -6,14 +6,13 @@ import com.food.ordering.payments.application.port.input.ProcessPaymentUseCase;
 import com.food.ordering.payments.application.port.input.RefundPaymentUseCase;
 import com.food.ordering.payments.application.port.input.dto.PaymentResponse;
 import com.food.ordering.payments.infrastructure.adapter.input.rest.dto.CreatePaymentRequest;
-import com.food.ordering.payments.infrastructure.config.SecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -28,8 +27,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(PaymentController.class)
-@Import(SecurityConfig.class)
+@WebMvcTest(value = PaymentController.class, excludeAutoConfiguration = OAuth2ResourceServerAutoConfiguration.class)
+@AutoConfigureMockMvc(addFilters = false)
 class PaymentControllerTest {
 
     @Autowired
@@ -57,7 +56,7 @@ class PaymentControllerTest {
 
     @Test
     @DisplayName("POST /api/v1/payments should return 201 Created")
-    @WithMockUser
+
     void shouldCreatePaymentAndReturn201() throws Exception {
         CreatePaymentRequest request = new CreatePaymentRequest(
                 "order-123", "user-456", new BigDecimal("99.99"), "CREDIT_CARD"
@@ -76,7 +75,7 @@ class PaymentControllerTest {
 
     @Test
     @DisplayName("GET /api/v1/payments/{id} should return 200 OK")
-    @WithMockUser
+
     void shouldGetPaymentByIdAndReturn200() throws Exception {
         when(getPaymentUseCase.getById(1L)).thenReturn(sampleResponse());
 
@@ -88,7 +87,7 @@ class PaymentControllerTest {
 
     @Test
     @DisplayName("GET /api/v1/payments/order/{orderId} should return 200 OK")
-    @WithMockUser
+
     void shouldGetPaymentByOrderIdAndReturn200() throws Exception {
         when(getPaymentUseCase.getByOrderId("order-123")).thenReturn(sampleResponse());
 
@@ -101,7 +100,7 @@ class PaymentControllerTest {
 
     @Test
     @DisplayName("POST /api/v1/payments/{id}/refund should return 200 OK")
-    @WithMockUser
+
     void shouldRefundPaymentAndReturn200() throws Exception {
         PaymentResponse refundResponse = new PaymentResponse(
                 1L, "order-123", "user-456",

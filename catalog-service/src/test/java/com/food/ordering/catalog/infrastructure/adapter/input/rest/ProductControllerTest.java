@@ -4,14 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.food.ordering.catalog.application.port.input.ManageProductUseCase;
 import com.food.ordering.catalog.application.port.input.ManageProductUseCase.ProductResponse;
 import com.food.ordering.catalog.infrastructure.adapter.input.rest.dto.CreateProductRequest;
-import com.food.ordering.catalog.infrastructure.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -25,8 +24,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ProductController.class)
-@Import(SecurityConfig.class)
+@WebMvcTest(value = ProductController.class, excludeAutoConfiguration = OAuth2ResourceServerAutoConfiguration.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ProductControllerTest {
 
     @Autowired
@@ -68,7 +67,7 @@ class ProductControllerTest {
     }
 
     @Test
-    @WithMockUser
+
     void shouldCreateProduct() throws Exception {
         CreateProductRequest request = new CreateProductRequest(
                 "Margherita Pizza", "Classic pizza",

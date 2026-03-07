@@ -9,14 +9,14 @@ import com.food.ordering.orders.application.port.input.response.OrderResponse;
 import com.food.ordering.orders.domain.exception.InvalidOrderStateException;
 import com.food.ordering.orders.domain.exception.OrderNotFoundException;
 import com.food.ordering.orders.infrastructure.config.GlobalExceptionHandler;
-import com.food.ordering.orders.infrastructure.config.SecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -30,8 +30,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(OrderController.class)
-@Import({GlobalExceptionHandler.class, SecurityConfig.class})
+@WebMvcTest(value = OrderController.class, excludeAutoConfiguration = OAuth2ResourceServerAutoConfiguration.class)
+@AutoConfigureMockMvc(addFilters = false)
+@Import(GlobalExceptionHandler.class)
 class OrderControllerTest {
 
     @Autowired
@@ -62,7 +63,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @WithMockUser
+
     @DisplayName("POST /api/v1/orders returns 201 Created")
     void createOrderReturns201() throws Exception {
         when(createOrderUseCase.create(any())).thenReturn(buildSampleResponse());
@@ -96,7 +97,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @WithMockUser
+
     @DisplayName("GET /api/v1/orders/{id} returns 200 OK")
     void getOrderReturns200() throws Exception {
         when(getOrderUseCase.getById(1L)).thenReturn(buildSampleResponse());
@@ -109,7 +110,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @WithMockUser
+
     @DisplayName("GET /api/v1/orders/{id} returns 404 when not found")
     void getOrderReturns404() throws Exception {
         when(getOrderUseCase.getById(999L)).thenThrow(new OrderNotFoundException(999L));
@@ -120,7 +121,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @WithMockUser
+
     @DisplayName("PATCH /api/v1/orders/{id}/status returns 200 OK")
     void updateOrderStatusReturns200() throws Exception {
         OrderResponse confirmedResponse = new OrderResponse(
@@ -149,7 +150,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @WithMockUser
+
     @DisplayName("GET /api/v1/orders/user/{userId} returns 200 OK")
     void getOrdersByUserReturns200() throws Exception {
         when(getOrderUseCase.getByUserId(100L)).thenReturn(List.of(buildSampleResponse()));
@@ -161,7 +162,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @WithMockUser
+
     @DisplayName("PATCH /api/v1/orders/{id}/status returns 409 for invalid transition")
     void updateOrderStatusReturns409ForInvalidTransition() throws Exception {
         when(updateOrderStatusUseCase.updateStatus(eq(1L), eq("PENDING")))
@@ -181,7 +182,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @WithMockUser
+
     @DisplayName("GET /api/v1/orders/user/{userId} returns empty list when no orders")
     void getOrdersByUserReturnsEmptyList() throws Exception {
         when(getOrderUseCase.getByUserId(999L)).thenReturn(List.of());
@@ -193,7 +194,7 @@ class OrderControllerTest {
     }
 
     @Test
-    @WithMockUser
+
     @DisplayName("POST /api/v1/orders returns correct response fields")
     void createOrderReturnsCorrectFields() throws Exception {
         when(createOrderUseCase.create(any())).thenReturn(buildSampleResponse());
