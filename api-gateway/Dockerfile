@@ -3,9 +3,8 @@ WORKDIR /app
 
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
-COPY api-gateway/target/*.jar app.jar
+COPY --chown=appuser:appgroup api-gateway/target/*.jar app.jar
 
-RUN chown -R appuser:appgroup /app
 USER appuser
 
 EXPOSE 8080

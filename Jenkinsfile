@@ -40,9 +40,13 @@ pipeline {
                     def services = ['users-service', 'orders-service', 'catalog-service', 'payments-service', 'deliveries-service', 'api-gateway']
                     def imageTag = "${env.BUILD_NUMBER}"
 
-                    // Build images sequentially to avoid Docker Desktop memory/IO pressure
-                    services.each { service ->
+                    // Build images sequentially with pauses to avoid Docker Desktop memory/IO pressure
+                    services.eachWithIndex { service, idx ->
                         sh "docker build -f ${service}/Dockerfile -t ${IMAGE_REGISTRY}/${service}:${imageTag} -t ${IMAGE_REGISTRY}/${service}:latest ."
+                        if (idx < services.size() - 1) {
+                            echo "Pausing 10s to let Docker Desktop release memory..."
+                            sleep(time: 10, unit: 'SECONDS')
+                        }
                     }
                 }
             }
