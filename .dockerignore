@@ -1,15 +1,11 @@
-# Ignore everything except what Docker needs
-**/src/
-**/node_modules/
-**/target/classes/
-**/target/generated-sources/
-**/target/maven-*
-**/target/surefire-reports/
-.git/
-.idea/
-*.md
-*.pdf
-bruno-collection/
-infrastructure/
-helm/
-scripts/
+# Ignore EVERYTHING by default
+**
+
+# Only allow the JARs and Dockerfiles that builds actually need
+!*/Dockerfile
+!users-service/target/*.jar
+!orders-service/target/*.jar
+!catalog-service/target/*.jar
+!payments-service/target/*.jar
+!deliveries-service/target/*.jar
+!api-gateway/target/*.jar

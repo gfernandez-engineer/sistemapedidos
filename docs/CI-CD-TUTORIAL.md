@@ -103,7 +103,7 @@ Cada tecnologia resuelve un problema especifico:
 │  │    1.    │  │     2.       │  │      3.        │                │
 │  │ Checkout │─▶│ Build &      │─▶│ Build Docker   │                │
 │  │  (git)   │  │ Unit Tests   │  │ Images (x6)    │                │
-│  │          │  │ (mvn verify) │  │ (en paralelo)  │                │
+│  │          │  │ (mvn verify) │  │ (secuencial)   │                │
 │  └──────────┘  └──────────────┘  └───────┬────────┘                │
 │                                          │                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌───▼────────────┐           │
@@ -432,17 +432,21 @@ AHORA:  [Copy JAR 5seg] x 6 servicios (en paralelo)          = ~10 seg
 ### .dockerignore - Excluir archivos innecesarios
 
 ```
-# .dockerignore - Evita enviar archivos innecesarios al Docker daemon
-**/src/                    # Codigo fuente (ya compilado)
-**/node_modules/           # Dependencias node
-.git/                      # Historia de Git
-*.md                       # Documentacion
-bruno-collection/          # Tests
-infrastructure/            # Config de infra
-helm/                      # Charts de Helm
+# .dockerignore - Estrategia "deny all, allow only needed"
+# Ignora TODO por defecto
+**
+
+# Solo permite los JARs compilados y Dockerfiles que el build necesita
+!*/Dockerfile
+!users-service/target/*.jar
+!orders-service/target/*.jar
+!catalog-service/target/*.jar
+!payments-service/target/*.jar
+!deliveries-service/target/*.jar
+!api-gateway/target/*.jar
 ```
 
-Sin `.dockerignore`, Docker envia TODO el proyecto como "build context" al daemon. Con el archivo, solo envia lo necesario (los JARs).
+Sin `.dockerignore`, Docker envia TODO el proyecto como "build context" al daemon (~500MB+). Con la estrategia de "negar todo y permitir solo lo necesario", el contexto se reduce a unos pocos MB (solo los fat JARs).
 
 ### docker-compose.yml - Entorno local completo
 
@@ -848,22 +852,19 @@ Lo que hace:
 3. Genera JARs en `*/target/*.jar` (listos para Docker)
 4. Jenkins muestra resultados de tests en su UI
 
-#### Stage 3: Build Docker Images (en paralelo)
+#### Stage 3: Build Docker Images (secuencial)
 
 ```groovy
     stage('Build Docker Images') {
         steps {
             script {
                 def services = ['users-service', 'orders-service', ...]
-                def parallelBuilds = [:]
+                // Build secuencial para evitar saturar Docker Desktop con IO
                 services.each { service ->
-                    parallelBuilds[service] = {
-                        sh "docker build -f ${service}/Dockerfile \
-                            -t food-ordering/${service}:${BUILD_NUMBER} \
-                            -t food-ordering/${service}:latest ."
-                    }
+                    sh "docker build -f ${service}/Dockerfile \
+                        -t food-ordering/${service}:${BUILD_NUMBER} \
+                        -t food-ordering/${service}:latest ."
                 }
-                parallel parallelBuilds  // Los 6 builds corren AL MISMO TIEMPO
             }
         }
     }
@@ -1391,7 +1392,7 @@ docker-compose up -d --build
 │  │ GitHub │◄────────────│            JENKINS (:9090)                 │  │
 │  │  main  │─────────────►│                                            │  │
 │  └────────┘              │  1. mvn clean verify (compile + test)      │  │
-│                          │  2. docker build x6 (paralelo, ~10s)       │  │
+│                          │  2. docker build x6 (secuencial)            │  │
 │                          │  3. helm upgrade --install                  │  │
 │                          │  4. kubectl wait (pods ready)               │  │
 │                          │  5. bru run (E2E tests)                     │  │

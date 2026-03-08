@@ -40,14 +40,10 @@ pipeline {
                     def services = ['users-service', 'orders-service', 'catalog-service', 'payments-service', 'deliveries-service', 'api-gateway']
                     def imageTag = "${env.BUILD_NUMBER}"
 
-                    // Build all images in parallel - Dockerfiles just copy pre-built JARs (no Maven inside Docker)
-                    def parallelBuilds = [:]
+                    // Build images sequentially to avoid Docker Desktop memory/IO pressure
                     services.each { service ->
-                        parallelBuilds[service] = {
-                            sh "docker build -f ${service}/Dockerfile -t ${IMAGE_REGISTRY}/${service}:${imageTag} -t ${IMAGE_REGISTRY}/${service}:latest ."
-                        }
+                        sh "docker build -f ${service}/Dockerfile -t ${IMAGE_REGISTRY}/${service}:${imageTag} -t ${IMAGE_REGISTRY}/${service}:latest ."
                     }
-                    parallel parallelBuilds
                 }
             }
         }
