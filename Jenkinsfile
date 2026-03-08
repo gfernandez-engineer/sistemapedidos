@@ -5,7 +5,7 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timestamps()
         disableConcurrentBuilds()
-        timeout(time: 45, unit: 'MINUTES')
+        timeout(time: 30, unit: 'MINUTES')
     }
 
     environment {
@@ -13,7 +13,6 @@ pipeline {
         IMAGE_REGISTRY = 'food-ordering'
         HELM_RELEASE = 'food-ordering'
         HELM_CHART = 'helm/food-ordering-system'
-        BRUNO_ENV = 'k8s'
     }
 
     stages {
@@ -41,9 +40,14 @@ pipeline {
                     def services = ['users-service', 'orders-service', 'catalog-service', 'payments-service', 'deliveries-service', 'api-gateway']
                     def imageTag = "${env.BUILD_NUMBER}"
 
+                    // Build all images in parallel - Dockerfiles just copy pre-built JARs (no Maven inside Docker)
+                    def parallelBuilds = [:]
                     services.each { service ->
-                        sh "docker build -f ${service}/Dockerfile -t ${IMAGE_REGISTRY}/${service}:${imageTag} -t ${IMAGE_REGISTRY}/${service}:latest ."
+                        parallelBuilds[service] = {
+                            sh "docker build -f ${service}/Dockerfile -t ${IMAGE_REGISTRY}/${service}:${imageTag} -t ${IMAGE_REGISTRY}/${service}:latest ."
+                        }
                     }
+                    parallel parallelBuilds
                 }
             }
         }
@@ -79,7 +83,7 @@ pipeline {
                         --namespace ${KUBE_NAMESPACE} \
                         --create-namespace \
                         --wait \
-                        --timeout 5m0s
+                        --timeout 8m0s
                 """
             }
         }
@@ -105,41 +109,71 @@ pipeline {
 
                     echo 'All pods ready.'
                 """
-                // Health check via actuator endpoints
+                // Health check via pod readiness status
                 sh 'chmod +x scripts/health-check.sh && ./scripts/health-check.sh'
             }
         }
 
         stage('E2E Tests - Bruno') {
             steps {
-                sh """
-                    cd bruno-collection
-                    echo '========================================'
-                    echo 'Running E2E tests with Bruno CLI'
-                    echo '========================================'
+                script {
+                    // Discover API Gateway NodePort for E2E access from Jenkins container
+                    def nodePort = sh(
+                        script: "kubectl get svc -n ${KUBE_NAMESPACE} -l app.kubernetes.io/name=api-gateway -o jsonpath='{.items[0].spec.ports[0].nodePort}'",
+                        returnStdout: true
+                    ).trim()
 
-                    echo '--- 1. Users ---'
-                    bru run --env ${BRUNO_ENV} 1-users/
+                    // From inside Docker container, reach K8s NodePort via host.docker.internal
+                    def gatewayUrl = "http://host.docker.internal:${nodePort}"
+                    echo "API Gateway URL for E2E: ${gatewayUrl}"
 
-                    echo '--- 2. Catalog ---'
-                    bru run --env ${BRUNO_ENV} 2-catalog/
+                    // Create dynamic Bruno environment for Jenkins
+                    writeFile file: 'bruno-collection/environments/jenkins.bru', text: """vars {
+  base_url: ${gatewayUrl}
+  users_url: ${gatewayUrl}
+  orders_url: ${gatewayUrl}
+  catalog_url: ${gatewayUrl}
+  payments_url: ${gatewayUrl}
+  deliveries_url: ${gatewayUrl}
+  user_id: 1
+  restaurant_id: 1
+  product_id: 1
+  order_id: 1
+  payment_id: 1
+  delivery_id: 1
+  driver_id: 1
+}
+"""
 
-                    echo '--- 3. Orders ---'
-                    bru run --env ${BRUNO_ENV} 3-orders/
+                    sh """
+                        cd bruno-collection
+                        echo '========================================'
+                        echo "Running E2E tests against ${gatewayUrl}"
+                        echo '========================================'
 
-                    echo '--- 4. Payments ---'
-                    bru run --env ${BRUNO_ENV} 4-payments/
+                        echo '--- 1. Users ---'
+                        bru run --env jenkins 1-users/
 
-                    echo '--- 5. Deliveries ---'
-                    bru run --env ${BRUNO_ENV} 5-deliveries/
+                        echo '--- 2. Catalog ---'
+                        bru run --env jenkins 2-catalog/
 
-                    echo '--- 6. Drivers ---'
-                    bru run --env ${BRUNO_ENV} 6-drivers/
+                        echo '--- 3. Orders ---'
+                        bru run --env jenkins 3-orders/
 
-                    echo '========================================'
-                    echo 'E2E tests completed successfully!'
-                    echo '========================================'
-                """
+                        echo '--- 4. Payments ---'
+                        bru run --env jenkins 4-payments/
+
+                        echo '--- 5. Deliveries ---'
+                        bru run --env jenkins 5-deliveries/
+
+                        echo '--- 6. Drivers ---'
+                        bru run --env jenkins 6-drivers/
+
+                        echo '========================================'
+                        echo 'E2E tests completed successfully!'
+                        echo '========================================'
+                    """
+                }
             }
         }
     }

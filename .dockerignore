@@ -1,0 +1,15 @@
+# Ignore everything except what Docker needs
+**/src/
+**/node_modules/
+**/target/classes/
+**/target/generated-sources/
+**/target/maven-*
+**/target/surefire-reports/
+.git/
+.idea/
+*.md
+*.pdf
+bruno-collection/
+infrastructure/
+helm/
+scripts/

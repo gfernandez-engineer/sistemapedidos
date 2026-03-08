@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: deliveries-service
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.global.imageTag | default .Values.image.tag }}"
           imagePullPolicy: {{ .Values.global.imagePullPolicy | default "IfNotPresent" }}
           ports:
             - containerPort: {{ .Values.service.port }}
