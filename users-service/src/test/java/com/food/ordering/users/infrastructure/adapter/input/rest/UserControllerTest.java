@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.security.oauth2.server.resource.autoconfigure.servlet.OAuth2ResourceServerAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -29,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(value = UserController.class, excludeAutoConfiguration = OAuth2ResourceServerAutoConfiguration.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, JacksonAutoConfiguration.class})
 class UserControllerTest {
 
     @Autowired
