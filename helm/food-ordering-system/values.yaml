@@ -161,6 +161,39 @@ api-gateway:
     maxReplicas: 5
     targetCPU: 70
 
+# Infrastructure (databases + Kafka in K8s)
+infrastructure:
+  enabled: false
+  databaseStorage: 1Gi
+  databaseResources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  databases:
+    - name: users-db
+      database: users_db
+      username: users_user
+      password: users_pass
+    - name: orders-db
+      database: orders_db
+      username: orders_user
+      password: orders_pass
+    - name: catalog-db
+      database: catalog_db
+      username: catalog_user
+      password: catalog_pass
+    - name: payments-db
+      database: payments_db
+      username: payments_user
+      password: payments_pass
+    - name: deliveries-db
+      database: deliveries_db
+      username: deliveries_user
+      password: deliveries_pass
+
 ingress:
   enabled: true
   className: nginx

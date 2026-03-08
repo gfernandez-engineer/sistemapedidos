@@ -1,0 +1,104 @@
+# E2E testing environment overrides
+# Uses nosecurity profile (no Keycloak required)
+# Deploys infrastructure (databases + Kafka) in K8s
+
+global:
+  namespace: food-ordering-e2e
+  imagePullPolicy: Never
+  springProfiles: nosecurity
+  kafka:
+    bootstrapServers: kafka:9092
+  jwt:
+    issuerUri: ""
+
+# Infrastructure (databases + Kafka deployed in K8s)
+infrastructure:
+  enabled: true
+  databaseStorage: 512Mi
+  databaseResources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+# All services: 1 replica, no HPA, minimal resources
+users-service:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+orders-service:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+catalog-service:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+payments-service:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+deliveries-service:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+api-gateway:
+  replicaCount: 1
+  service:
+    type: NodePort
+  autoscaling:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+ingress:
+  enabled: true
+  className: nginx
+  host: api.food-ordering.local

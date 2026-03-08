@@ -99,7 +99,10 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
@@ -114,7 +117,7 @@ services:
     image: prom/prometheus:v2.51.0
     container_name: prometheus
     ports:
-      - "9090:9090"
+      - "9091:9090"
     volumes:
       - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
@@ -178,7 +181,9 @@ services:
   # ============================================================
 
   users-service:
-    build: ./users-service
+    build:
+      context: .
+      dockerfile: users-service/Dockerfile
     container_name: users-service
     ports:
       - "8081:8081"
@@ -186,7 +191,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://users-db:5432/users_db
       SPRING_DATASOURCE_USERNAME: users_user
       SPRING_DATASOURCE_PASSWORD: users_pass
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       - users-db
       - kafka
@@ -194,7 +199,9 @@ services:
       - food-network
 
   orders-service:
-    build: ./orders-service
+    build:
+      context: .
+      dockerfile: orders-service/Dockerfile
     container_name: orders-service
     ports:
       - "8082:8082"
@@ -202,7 +209,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://orders-db:5432/orders_db
       SPRING_DATASOURCE_USERNAME: orders_user
       SPRING_DATASOURCE_PASSWORD: orders_pass
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       - orders-db
       - kafka
@@ -210,7 +217,9 @@ services:
       - food-network
 
   catalog-service:
-    build: ./catalog-service
+    build:
+      context: .
+      dockerfile: catalog-service/Dockerfile
     container_name: catalog-service
     ports:
       - "8083:8083"
@@ -218,7 +227,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://catalog-db:5432/catalog_db
       SPRING_DATASOURCE_USERNAME: catalog_user
       SPRING_DATASOURCE_PASSWORD: catalog_pass
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       - catalog-db
       - kafka
@@ -226,7 +235,9 @@ services:
       - food-network
 
   payments-service:
-    build: ./payments-service
+    build:
+      context: .
+      dockerfile: payments-service/Dockerfile
     container_name: payments-service
     ports:
       - "8084:8084"
@@ -234,7 +245,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://payments-db:5432/payments_db
       SPRING_DATASOURCE_USERNAME: payments_user
       SPRING_DATASOURCE_PASSWORD: payments_pass
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       - payments-db
       - kafka
@@ -242,7 +253,9 @@ services:
       - food-network
 
   deliveries-service:
-    build: ./deliveries-service
+    build:
+      context: .
+      dockerfile: deliveries-service/Dockerfile
     container_name: deliveries-service
     ports:
       - "8085:8085"
@@ -250,7 +263,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://deliveries-db:5432/deliveries_db
       SPRING_DATASOURCE_USERNAME: deliveries_user
       SPRING_DATASOURCE_PASSWORD: deliveries_pass
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     depends_on:
       - deliveries-db
       - kafka
@@ -258,7 +271,9 @@ services:
       - food-network
 
   api-gateway:
-    build: ./api-gateway
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
     container_name: api-gateway
     ports:
       - "8080:8080"

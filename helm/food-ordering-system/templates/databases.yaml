@@ -1,0 +1,79 @@
+{{- if .Values.infrastructure.enabled }}
+{{- range .Values.infrastructure.databases }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .name }}
+  namespace: {{ include "food-ordering.namespace" $ }}
+  labels:
+    app: {{ .name }}
+    {{- include "food-ordering.labels" $ | nindent 4 }}
+spec:
+  serviceName: {{ .name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .name }}
+    spec:
+      containers:
+        - name: {{ .name }}
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: {{ .database }}
+            - name: POSTGRES_USER
+              value: {{ .username }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .password }}
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: {{ $.Values.infrastructure.databaseResources.requests.memory | default "128Mi" }}
+              cpu: {{ $.Values.infrastructure.databaseResources.requests.cpu | default "100m" }}
+            limits:
+              memory: {{ $.Values.infrastructure.databaseResources.limits.memory | default "256Mi" }}
+              cpu: {{ $.Values.infrastructure.databaseResources.limits.cpu | default "250m" }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: {{ $.Values.infrastructure.databaseStorage | default "1Gi" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}
+  namespace: {{ include "food-ordering.namespace" $ }}
+  labels:
+    app: {{ .name }}
+spec:
+  selector:
+    app: {{ .name }}
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
+{{- end }}
+{{- end }}

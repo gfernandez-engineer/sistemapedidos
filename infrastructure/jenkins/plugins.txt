@@ -10,3 +10,5 @@ timestamper
 ws-cleanup
 docker-workflow
 dark-theme
+kubernetes
+kubernetes-cli

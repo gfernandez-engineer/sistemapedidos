@@ -1,16 +1,28 @@
-FROM maven:3.9-eclipse-temurin-25 AS build
+FROM maven:3.9-eclipse-temurin-25 AS builder
 WORKDIR /app
+
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
-COPY src ./src
-RUN mvn clean package -DskipTests -B
+COPY common/pom.xml common/
+COPY users-service/pom.xml users-service/
+COPY orders-service/pom.xml orders-service/
+COPY catalog-service/pom.xml catalog-service/
+COPY payments-service/pom.xml payments-service/
+COPY deliveries-service/pom.xml deliveries-service/
+COPY api-gateway/pom.xml api-gateway/
 
-FROM eclipse-temurin:25-jre-alpine
+COPY common/src common/src
+RUN mvn -N install -DskipTests -B -q && \
+    mvn -pl common install -DskipTests -B -q
+
+COPY orders-service/src orders-service/src
+RUN mvn -pl orders-service package -DskipTests -B -q
+
+FROM eclipse-temurin:25-jre
 WORKDIR /app
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=builder /app/orders-service/target/*.jar app.jar
 
 RUN chown -R appuser:appgroup /app
 USER appuser

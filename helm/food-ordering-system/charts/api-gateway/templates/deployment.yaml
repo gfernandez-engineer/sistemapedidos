@@ -32,6 +32,10 @@ spec:
               value: http://{{ .Release.Name }}-payments-service:8084
             - name: DELIVERIES_SERVICE_URL
               value: http://{{ .Release.Name }}-deliveries-service:8085
+            {{- if .Values.global.springProfiles }}
+            - name: SPRING_PROFILES_ACTIVE
+              value: {{ .Values.global.springProfiles }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /actuator/health

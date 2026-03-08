@@ -41,6 +41,10 @@ spec:
               value: {{ .Values.global.kafka.bootstrapServers | default "kafka:9092" }}
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
               value: {{ .Values.global.jwt.issuerUri | default "http://keycloak:8080/realms/food-ordering" }}
+            {{- if .Values.global.springProfiles }}
+            - name: SPRING_PROFILES_ACTIVE
+              value: {{ .Values.global.springProfiles }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /actuator/health
