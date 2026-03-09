@@ -73,8 +73,10 @@ pipeline {
         stage('Deploy with Helm') {
             steps {
                 sh """
-                    # Ensure namespace exists (idempotent)
+                    # Ensure namespace exists with Helm ownership labels (idempotent)
                     kubectl create namespace ${KUBE_NAMESPACE} 2>/dev/null || true
+                    kubectl label namespace ${KUBE_NAMESPACE} app.kubernetes.io/managed-by=Helm --overwrite
+                    kubectl annotate namespace ${KUBE_NAMESPACE} meta.helm.sh/release-name=${HELM_RELEASE} meta.helm.sh/release-namespace=${KUBE_NAMESPACE} --overwrite
 
                     # Update Helm dependencies
                     helm dependency update ${HELM_CHART} || true
