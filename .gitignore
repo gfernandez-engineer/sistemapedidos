@@ -32,3 +32,6 @@ logs/
 
 # Docker volumes
 *-data/
+
+# Speech / presentacion
+docs/SPEECH*.md
