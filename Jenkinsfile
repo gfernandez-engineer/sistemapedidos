@@ -63,12 +63,15 @@ pipeline {
 
                     sh 'mkdir -p target/trivy-reports'
 
-                    // Ensure Trivy cache volume exists and pre-download vuln DB + Java DB once
+                    // Pre-download Trivy vuln DB + Java DB into a persistent Docker volume
                     sh "docker volume create ${trivyCache} || true"
                     sh """
                         docker run --rm \
                             -v ${trivyCache}:/root/.cache/ \
-                            aquasec/trivy image --download-db-only --download-java-db-only || true
+                            aquasec/trivy image --download-db-only 2>&1 || true
+                        docker run --rm \
+                            -v ${trivyCache}:/root/.cache/ \
+                            aquasec/trivy image --download-java-db-only 2>&1 || true
                     """
 
                     // Trivy image scan: detect OS + library vulnerabilities in each Docker image
@@ -76,15 +79,13 @@ pipeline {
                     services.each { service ->
                         def image = "${IMAGE_REGISTRY}/${service}:${imageTag}"
                         echo "Scanning ${image}..."
-                        // Console table output (skip DB downloads - already cached)
+                        // Console table output
                         sh """
                             docker run --rm \
                                 -v /var/run/docker.sock:/var/run/docker.sock \
                                 -v ${trivyCache}:/root/.cache/ \
                                 aquasec/trivy image \
                                 --severity ${TRIVY_SEVERITY} \
-                                --skip-db-update \
-                                --skip-java-db-update \
                                 --format table \
                                 ${image} || true
                         """
@@ -96,8 +97,6 @@ pipeline {
                                 -v \$(pwd)/target/trivy-reports:/output \
                                 aquasec/trivy image \
                                 --severity ${TRIVY_SEVERITY} \
-                                --skip-db-update \
-                                --skip-java-db-update \
                                 --format json \
                                 --output /output/${service}.json \
                                 ${image} || true
