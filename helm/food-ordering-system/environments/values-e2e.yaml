@@ -22,8 +22,8 @@ infrastructure:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "256Mi"
-      cpu: "250m"
+      memory: "512Mi"
+      cpu: "500m"
 
 # All services: 1 replica, no HPA, minimal resources
 users-service:
@@ -35,8 +35,8 @@ users-service:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "256Mi"
-      cpu: "250m"
+      memory: "512Mi"
+      cpu: "500m"
 
 orders-service:
   replicaCount: 1
@@ -47,8 +47,8 @@ orders-service:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "256Mi"
-      cpu: "250m"
+      memory: "512Mi"
+      cpu: "500m"
 
 catalog-service:
   replicaCount: 1
@@ -59,8 +59,8 @@ catalog-service:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "256Mi"
-      cpu: "250m"
+      memory: "512Mi"
+      cpu: "500m"
 
 payments-service:
   replicaCount: 1
@@ -71,8 +71,8 @@ payments-service:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "256Mi"
-      cpu: "250m"
+      memory: "512Mi"
+      cpu: "500m"
 
 deliveries-service:
   replicaCount: 1
@@ -83,8 +83,8 @@ deliveries-service:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "256Mi"
-      cpu: "250m"
+      memory: "512Mi"
+      cpu: "500m"
 
 api-gateway:
   replicaCount: 1
@@ -97,8 +97,8 @@ api-gateway:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "256Mi"
-      cpu: "250m"
+      memory: "512Mi"
+      cpu: "500m"
 
 ingress:
   enabled: true
