@@ -5,7 +5,7 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timestamps()
         disableConcurrentBuilds()
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
     }
 
     environment {
@@ -13,6 +13,7 @@ pipeline {
         IMAGE_REGISTRY = 'food-ordering'
         HELM_RELEASE = 'food-ordering'
         HELM_CHART = 'helm/food-ordering-system'
+        TRIVY_SEVERITY = 'CRITICAL,HIGH'
     }
 
     stages {
@@ -48,6 +49,65 @@ pipeline {
                             sleep(time: 10, unit: 'SECONDS')
                         }
                     }
+                }
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                script {
+                    def services = ['users-service', 'orders-service', 'catalog-service', 'payments-service', 'deliveries-service', 'api-gateway']
+                    def imageTag = "${env.BUILD_NUMBER}"
+
+                    // 1. OWASP Dependency-Check: scan Maven dependencies for known CVEs
+                    echo '=== OWASP Dependency-Check ==='
+                    sh 'mvn org.owasp:dependency-check-maven:check -B -DfailBuildOnCVSS=11 -Dformats=HTML,JSON -DoutputDirectory=target/dependency-check || true'
+
+                    // 2. Trivy: scan Docker images for OS and library vulnerabilities
+                    echo '=== Trivy Image Scan ==='
+                    sh 'mkdir -p target/trivy-reports'
+                    services.each { service ->
+                        def image = "${IMAGE_REGISTRY}/${service}:${imageTag}"
+                        echo "Scanning ${image}..."
+                        sh """
+                            docker run --rm \
+                                -v /var/run/docker.sock:/var/run/docker.sock \
+                                -v \$(pwd)/target/trivy-reports:/output \
+                                aquasec/trivy image \
+                                --severity ${TRIVY_SEVERITY} \
+                                --format template \
+                                --template '@/contrib/html.tpl' \
+                                --output /output/${service}.html \
+                                ${image} || true
+                        """
+                        // Also print summary to console
+                        sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity ${TRIVY_SEVERITY} --format table ${image} || true"
+                    }
+                }
+            }
+            post {
+                always {
+                    // Archive OWASP report
+                    archiveArtifacts artifacts: 'target/dependency-check/*.html', allowEmptyArchive: true
+                    // Archive Trivy reports
+                    archiveArtifacts artifacts: 'target/trivy-reports/*.html', allowEmptyArchive: true
+                    // Publish HTML reports if HTML Publisher plugin is installed
+                    publishHTML(target: [
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'target/dependency-check',
+                        reportFiles: 'dependency-check-report.html',
+                        reportName: 'OWASP Dependency Check'
+                    ])
+                    publishHTML(target: [
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'target/trivy-reports',
+                        reportFiles: 'users-service.html,orders-service.html,catalog-service.html,payments-service.html,deliveries-service.html,api-gateway.html',
+                        reportName: 'Trivy Image Scan'
+                    ])
                 }
             }
         }
