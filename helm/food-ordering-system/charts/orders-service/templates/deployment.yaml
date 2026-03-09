@@ -49,17 +49,21 @@ spec:
             - name: SPRING_JPA_HIBERNATE_DDL_AUTO
               value: {{ .Values.global.jpa.ddlAuto | default "validate" }}
             {{- end }}
+            {{- if .Values.global.javaOpts }}
+            - name: JAVA_TOOL_OPTIONS
+              value: {{ .Values.global.javaOpts | quote }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /actuator/health
               port: {{ .Values.service.port }}
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: {{ .Values.service.port }}
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             periodSeconds: 30
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

@@ -12,6 +12,7 @@ global:
     issuerUri: ""
   jpa:
     ddlAuto: update
+  javaOpts: "-Xmx180m -Xms64m -XX:+UseSerialGC -XX:MaxMetaspaceSize=100m"
 
 # Infrastructure (databases + Kafka deployed in K8s)
 infrastructure:
@@ -19,11 +20,11 @@ infrastructure:
   databaseStorage: 512Mi
   databaseResources:
     requests:
-      memory: "128Mi"
-      cpu: "100m"
+      memory: "64Mi"
+      cpu: "50m"
     limits:
-      memory: "512Mi"
-      cpu: "500m"
+      memory: "256Mi"
+      cpu: "250m"
 
 # All services: 1 replica, no HPA, minimal resources
 users-service:
@@ -35,7 +36,7 @@ users-service:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "512Mi"
+      memory: "300Mi"
       cpu: "500m"
 
 orders-service:
@@ -47,7 +48,7 @@ orders-service:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "512Mi"
+      memory: "300Mi"
       cpu: "500m"
 
 catalog-service:
@@ -59,7 +60,7 @@ catalog-service:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "512Mi"
+      memory: "300Mi"
       cpu: "500m"
 
 payments-service:
@@ -71,7 +72,7 @@ payments-service:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "512Mi"
+      memory: "300Mi"
       cpu: "500m"
 
 deliveries-service:
@@ -83,7 +84,7 @@ deliveries-service:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "512Mi"
+      memory: "300Mi"
       cpu: "500m"
 
 api-gateway:
@@ -97,7 +98,7 @@ api-gateway:
       memory: "128Mi"
       cpu: "100m"
     limits:
-      memory: "512Mi"
+      memory: "300Mi"
       cpu: "500m"
 
 ingress:
