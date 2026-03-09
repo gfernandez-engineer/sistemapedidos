@@ -25,7 +25,14 @@ pipeline {
 
         stage('Build & Unit Tests') {
             steps {
-                sh 'mvn clean verify -B'
+                sh '''
+                    docker run --rm \
+                        -v "$(pwd)":/app \
+                        -v jenkins-maven-repo:/root/.m2 \
+                        -w /app \
+                        maven:3.9-eclipse-temurin-25-alpine \
+                        mvn clean verify -B
+                '''
             }
             post {
                 always {
