@@ -45,6 +45,10 @@ spec:
             - name: SPRING_PROFILES_ACTIVE
               value: {{ .Values.global.springProfiles }}
             {{- end }}
+            {{- if .Values.global.jpa }}
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: {{ .Values.global.jpa.ddlAuto | default "validate" }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /actuator/health

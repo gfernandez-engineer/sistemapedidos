@@ -10,6 +10,8 @@ global:
     bootstrapServers: kafka:9092
   jwt:
     issuerUri: ""
+  jpa:
+    ddlAuto: update
 
 # Infrastructure (databases + Kafka deployed in K8s)
 infrastructure:
