@@ -63,12 +63,12 @@ pipeline {
 
                     sh 'mkdir -p target/trivy-reports'
 
-                    // Ensure Trivy cache volume exists and pre-download the vulnerability DB once
+                    // Ensure Trivy cache volume exists and pre-download vuln DB + Java DB once
                     sh "docker volume create ${trivyCache} || true"
                     sh """
                         docker run --rm \
                             -v ${trivyCache}:/root/.cache/ \
-                            aquasec/trivy image --download-db-only || true
+                            aquasec/trivy image --download-db-only --download-java-db-only || true
                     """
 
                     // Trivy image scan: detect OS + library vulnerabilities in each Docker image
@@ -76,7 +76,7 @@ pipeline {
                     services.each { service ->
                         def image = "${IMAGE_REGISTRY}/${service}:${imageTag}"
                         echo "Scanning ${image}..."
-                        // Console table output
+                        // Console table output (skip DB downloads - already cached)
                         sh """
                             docker run --rm \
                                 -v /var/run/docker.sock:/var/run/docker.sock \
@@ -84,6 +84,7 @@ pipeline {
                                 aquasec/trivy image \
                                 --severity ${TRIVY_SEVERITY} \
                                 --skip-db-update \
+                                --skip-java-db-update \
                                 --format table \
                                 ${image} || true
                         """
@@ -96,6 +97,7 @@ pipeline {
                                 aquasec/trivy image \
                                 --severity ${TRIVY_SEVERITY} \
                                 --skip-db-update \
+                                --skip-java-db-update \
                                 --format json \
                                 --output /output/${service}.json \
                                 ${image} || true
