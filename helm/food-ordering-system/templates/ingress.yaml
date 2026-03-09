@@ -28,47 +28,47 @@ spec:
               service:
                 name: {{ .Release.Name }}-users-service
                 port:
-                  number: {{ .Values.users_service.service.port | default 8081 }}
+                  number: {{ dig "users-service" "service" "port" 8081 .Values }}
           - path: /api/v1/orders
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-orders-service
                 port:
-                  number: {{ .Values.orders_service.service.port | default 8082 }}
+                  number: {{ dig "orders-service" "service" "port" 8082 .Values }}
           - path: /api/v1/restaurants
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-catalog-service
                 port:
-                  number: {{ .Values.catalog_service.service.port | default 8083 }}
+                  number: {{ dig "catalog-service" "service" "port" 8083 .Values }}
           - path: /api/v1/products
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-catalog-service
                 port:
-                  number: {{ .Values.catalog_service.service.port | default 8083 }}
+                  number: {{ dig "catalog-service" "service" "port" 8083 .Values }}
           - path: /api/v1/payments
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-payments-service
                 port:
-                  number: {{ .Values.payments_service.service.port | default 8084 }}
+                  number: {{ dig "payments-service" "service" "port" 8084 .Values }}
           - path: /api/v1/deliveries
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-deliveries-service
                 port:
-                  number: {{ .Values.deliveries_service.service.port | default 8085 }}
+                  number: {{ dig "deliveries-service" "service" "port" 8085 .Values }}
           - path: /api/v1/drivers
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-deliveries-service
                 port:
-                  number: {{ .Values.deliveries_service.service.port | default 8085 }}
+                  number: {{ dig "deliveries-service" "service" "port" 8085 .Values }}
 {{- end }}
