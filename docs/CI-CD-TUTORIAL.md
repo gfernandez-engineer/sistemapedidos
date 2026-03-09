@@ -22,7 +22,8 @@
 14. [Plugins de Jenkins para Visualizar Stages](#14-plugins-de-jenkins-para-visualizar-stages)
 15. [Jenkins Remoto (Servidor en AWS/Cloud)](#15-jenkins-remoto-servidor-en-awscloud)
 16. [Como se Conecta Jenkins con Kubernetes](#16-como-se-conecta-jenkins-con-kubernetes)
-17. [Glosario](#17-glosario)
+17. [Lecciones del Pipeline: Problemas Reales y Soluciones](#17-lecciones-del-pipeline-problemas-reales-y-soluciones)
+18. [Glosario](#18-glosario)
 
 ---
 
@@ -1637,7 +1638,328 @@ Si usas Minikube en lugar de Docker Desktop, el daemon es diferente. Por eso el 
 
 ---
 
-## 17. Glosario
+## 17. Lecciones del Pipeline: Problemas Reales y Soluciones
+
+Esta seccion documenta todos los problemas encontrados al hacer funcionar el pipeline CI/CD completo, desde el build #22 hasta el primer build exitoso (#32). Cada problema incluye: que error se vio, por que ocurrio, y como se resolvio.
+
+### 17.1 Helm --create-namespace falla si el namespace ya existe
+
+**Error:**
+```
+Error: 1 error occurred:
+    * namespaces "food-ordering-e2e" already exists
+```
+
+**Por que ocurre:** `helm upgrade --install --create-namespace` falla cuando el namespace ya existe pero NO tiene un Helm release asociado. Esto pasa cuando un deploy anterior fallo a medio camino: Helm creo el namespace pero no pudo completar la instalacion, dejando el namespace huerfano.
+
+**Solucion:** Pre-crear el namespace de forma idempotente y agregarle las labels de ownership que Helm requiere:
+
+```groovy
+sh """
+    kubectl create namespace ${KUBE_NAMESPACE} 2>/dev/null || true
+    kubectl label namespace ${KUBE_NAMESPACE} app.kubernetes.io/managed-by=Helm --overwrite
+    kubectl annotate namespace ${KUBE_NAMESPACE} \
+        meta.helm.sh/release-name=${HELM_RELEASE} \
+        meta.helm.sh/release-namespace=${KUBE_NAMESPACE} --overwrite
+
+    helm upgrade --install ${HELM_RELEASE} ${HELM_CHART} \
+        --namespace ${KUBE_NAMESPACE} \
+        --wait --timeout 8m0s
+"""
+```
+
+**Por que las labels:** Helm marca cada recurso que gestiona con `app.kubernetes.io/managed-by: Helm` y anotaciones `meta.helm.sh/release-name` y `meta.helm.sh/release-namespace`. Si un namespace existe sin estas labels, Helm lo rechaza con "invalid ownership metadata". Al agregarlas antes del `helm upgrade`, Helm puede "adoptar" el namespace existente.
+
+---
+
+### 17.2 Kafka CrashLoopBackOff por variables de entorno de K8s
+
+**Error:**
+```
+port is deprecated. Please use KAFKA_ADVERTISED_LISTENERS instead.
+```
+Kafka muere en 7 segundos, Exit Code 1. Solo 4 lineas de log.
+
+**Por que ocurre:** Kubernetes inyecta automaticamente variables de entorno para cada Service en el namespace. Si tienes un Service llamado `kafka`, K8s crea:
+
+```
+KAFKA_PORT=tcp://10.x.x.x:9092
+KAFKA_SERVICE_PORT=9092
+KAFKA_SERVICE_HOST=10.x.x.x
+KAFKA_PORT_9092_TCP=tcp://10.x.x.x:9092
+```
+
+El entrypoint de Confluent cp-kafka interpreta **toda** variable que empiece con `KAFKA_` como configuracion de Kafka. Al encontrar `KAFKA_PORT=tcp://...` la trata como el parametro deprecado `port` y falla silenciosamente.
+
+**Solucion:** Agregar `enableServiceLinks: false` en el pod spec de Kafka:
+
+```yaml
+spec:
+  enableServiceLinks: false   # Evita que K8s inyecte KAFKA_PORT, etc.
+  containers:
+    - name: kafka
+      image: confluentinc/cp-kafka:7.6.0
+```
+
+**Por que funciona:** `enableServiceLinks: false` le dice a K8s que NO inyecte las variables de entorno de Service discovery en este pod. Kafka no las necesita porque se configura via sus propias variables `KAFKA_ADVERTISED_LISTENERS`, `KAFKA_ZOOKEEPER_CONNECT`, etc.
+
+**Extras aplicados:**
+- `KAFKA_HEAP_OPTS: "-Xmx512m -Xms256m"` para controlar el heap del JVM dentro del memory limit del pod
+- initContainer que espera a Zookeeper antes de iniciar Kafka (`until nc -z zookeeper 2181`)
+
+---
+
+### 17.3 Pods OOMKilled (Exit Code 137) - Memoria insuficiente
+
+**Error:**
+```
+Exit Code: 137    (OOMKilled)
+```
+Los servicios mueren durante el startup de Hibernate. El log se corta abruptamente.
+
+**Por que ocurre:** Spring Boot 4.0.3 + Java 25 + Hibernate 7 necesitan mas memoria que versiones anteriores. Con un memory limit de 256Mi, el JVM defaultea a usar ~25% de la RAM del container como heap (~64Mi), pero necesita mas para:
+
+- JVM overhead (class loading, JIT, etc.): ~80-100Mi
+- Heap (objetos, Spring context, Hibernate metadata): ~100-150Mi
+- Metaspace (clases cargadas): ~50-80Mi
+- Stacks de threads: ~20-30Mi
+
+**Calculo del problema original:**
+```
+6 servicios x 512Mi = 3072Mi
+5 DBs x 512Mi       = 2560Mi
+Kafka (1Gi) + ZK (512Mi) = 1536Mi
+API Gateway          = 512Mi
+─────────────────────────────
+Total limits         = 7680Mi  (128% de 6GB disponibles!)
+```
+
+**Solucion:** Reducir limits y controlar el JVM explicitamente:
+
+```yaml
+# values-e2e.yaml
+global:
+  javaOpts: "-Xmx180m -Xms64m -XX:+UseSerialGC -XX:MaxMetaspaceSize=100m"
+
+# Cada servicio:
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "300Mi"
+    cpu: "500m"
+```
+
+**Desglose de los flags JVM:**
+
+| Flag | Proposito |
+|---|---|
+| `-Xmx180m` | Heap maximo de 180Mi (cabe en el limit de 300Mi) |
+| `-Xms64m` | Heap inicial de 64Mi (arranque rapido, crece segun necesite) |
+| `-XX:+UseSerialGC` | GC serial, usa menos memoria que G1GC (default). Ideal para single-core con heap chico |
+| `-XX:MaxMetaspaceSize=100m` | Limita el espacio de clases cargadas para evitar crecimiento descontrolado |
+
+**Calculo despues del fix:**
+```
+6 servicios x 300Mi = 1800Mi
+5 DBs x 256Mi       = 1280Mi
+Kafka (1Gi) + ZK (512Mi) = 1536Mi
+API Gateway          = 300Mi
+─────────────────────────────
+Total limits         = 4916Mi  (82% de 6GB → funciona!)
+```
+
+---
+
+### 17.4 Flyway no ejecuta migraciones en Spring Boot 4.0.3
+
+**Error:**
+```
+Schema validation: missing table [users]
+```
+No hay NINGUN log de Flyway. Las tablas no se crean en las DBs de K8s.
+
+**Por que ocurre:** Con Spring Boot 4.0.3 y Flyway 11.14.1, la auto-configuracion de Flyway no se activa. Esto es un cambio de comportamiento respecto a versiones anteriores donde bastaba tener `flyway-core` en el classpath.
+
+En desarrollo local no se nota porque las DBs ya tienen las tablas de ejecuciones anteriores. En K8s cada deploy crea DBs frescas (vacias).
+
+**Solucion temporal (E2E):** Usar `ddl-auto: update` via variable de entorno solo en el perfil E2E:
+
+```yaml
+# values-e2e.yaml
+global:
+  jpa:
+    ddlAuto: update    # Hibernate crea las tablas si no existen
+
+# deployment.yaml (cada servicio)
+env:
+  - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+    value: {{ .Values.global.jpa.ddlAuto | default "validate" }}
+```
+
+**Por que "update" y no "create":**
+- `validate`: solo verifica que el schema coincida (produccion)
+- `update`: crea tablas faltantes, agrega columnas nuevas, nunca elimina (seguro para E2E)
+- `create`: DROP + CREATE cada vez (destruye datos)
+- `create-drop`: igual que create pero elimina al apagar (solo tests unitarios)
+
+**Nota:** Esto NO ejecuta los scripts `V2__seed_data.sql` de Flyway. Los tests E2E crean sus propios datos via las APIs (POST requests). Si un test necesita datos pre-existentes, hay que resolverlo por separado.
+
+---
+
+### 17.5 KafkaTemplate bean no encontrado en Spring Boot 4.0.3
+
+**Error:**
+```
+Parameter 0 of constructor in KafkaOrderEventPublisher required a bean
+of type 'org.springframework.kafka.core.KafkaTemplate' that could not be found.
+```
+
+**Por que ocurre:** La auto-configuracion de `KafkaTemplate` no se activa en Spring Boot 4.0.3 para los servicios que publican eventos (orders, payments, deliveries). Los servicios que solo consumen (users, catalog) no se ven afectados porque no inyectan `KafkaTemplate`.
+
+**Solucion:** Crear el `KafkaTemplate` explicitamente en la clase `KafkaConfig` de cada servicio productor:
+
+```java
+@Configuration
+public class KafkaConfig {
+
+    @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
+    private String bootstrapServers;
+
+    @Bean
+    public ProducerFactory<String, Object> producerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        props.put(JsonSerializer.ADD_TYPE_INFO_HEADERS, false);
+        return new DefaultKafkaProducerFactory<>(props);
+    }
+
+    @Bean
+    public KafkaTemplate<String, Object> kafkaTemplate(
+            ProducerFactory<String, Object> producerFactory) {
+        return new KafkaTemplate<>(producerFactory);
+    }
+
+    // ... topic beans existentes ...
+}
+```
+
+**Servicios afectados:** orders-service, payments-service, deliveries-service (los 3 que tienen `*EventPublisher` con `KafkaTemplate`).
+
+**Por que `@Value` para bootstrap-servers:** Permite que la variable de entorno `SPRING_KAFKA_BOOTSTRAP_SERVERS` (inyectada por K8s) sobreescriba el valor del application.yml (`localhost:9092`).
+
+---
+
+### 17.6 Labels de pods incorrectas en kubectl wait
+
+**Error:**
+```
+error: no matching resources found
+```
+en `kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=users-service`
+
+**Por que ocurre:** Los deployment templates de Helm usan el label `app: users-service` (sin namespace kubernetes.io), pero el Jenkinsfile y health-check.sh buscaban `app.kubernetes.io/name=users-service`.
+
+Los pods tenian:
+```yaml
+labels:
+  app: users-service                          # este label existe
+  app.kubernetes.io/instance: food-ordering   # pero este no es /name
+```
+
+**Solucion:** Cambiar los selectors en Jenkinsfile y health-check.sh para usar el label correcto:
+
+```groovy
+// Antes (incorrecto):
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=users-service
+
+// Despues (correcto):
+kubectl wait --for=condition=ready pod -l app=users-service
+```
+
+**Leccion:** Siempre verificar los labels reales de los pods con:
+```bash
+kubectl get pods -n food-ordering-e2e --show-labels
+```
+
+---
+
+### 17.7 Helm --wait se cuelga indefinidamente
+
+**Sintoma:** El stage "Deploy with Helm" se queda corriendo por horas a pesar de tener `--timeout 8m0s`.
+
+**Por que ocurre:** Cuando los pods estan en un ciclo de crash-restart (no CrashLoopBackOff exactamente, sino restarts lentos con backoff), Helm `--wait` puede no detectar correctamente el timeout. Esto combinado con el cluster sobrecargado (128% memoria) causa que el proceso Helm se quede en un estado semi-bloqueado.
+
+**Solucion:** Este problema se resolvio al arreglar las causas raiz:
+
+1. Reducir la presion de recursos (seccion 17.3)
+2. Arreglar el crash de Kafka (seccion 17.2)
+3. Arreglar el crash de los servicios por falta de KafkaTemplate (seccion 17.5)
+
+**Prevencion:** El pipeline de Jenkins tiene un `timeout(time: 30, unit: 'MINUTES')` global. Si Helm se queda colgado, Jenkins lo matara despues de 30 minutos. Pero lo ideal es que los problemas de pods se resuelvan para que `--wait` funcione correctamente.
+
+---
+
+### 17.8 Probes demasiado agresivos causan restart prematuro
+
+**Sintoma:** Pods restarteados por K8s antes de terminar el startup de Spring Boot.
+
+**Configuracion original:**
+```yaml
+readinessProbe:
+  initialDelaySeconds: 30    # Demasiado pronto
+  periodSeconds: 10
+livenessProbe:
+  initialDelaySeconds: 60    # Demasiado pronto con heap limitado
+  periodSeconds: 30
+```
+
+**Por que ocurre:** Con heap limitado (-Xmx180m) y SerialGC, Spring Boot tarda mas en arrancar (~60-90s en vez de ~30-40s). Si el livenessProbe empieza a verificar a los 60s y el servicio aun no esta listo, despues de 3 fallos consecutivos (60 + 30*3 = 150s) K8s lo mata.
+
+**Solucion:**
+```yaml
+readinessProbe:
+  initialDelaySeconds: 60    # Esperar 1 minuto antes de verificar
+  periodSeconds: 10
+livenessProbe:
+  initialDelaySeconds: 120   # Esperar 2 minutos antes de verificar
+  periodSeconds: 30
+```
+
+Con estos valores, K8s no mata un pod hasta `120 + 30*3 = 210s` (3.5 minutos), suficiente para el startup con heap limitado.
+
+**Diferencia entre probes:**
+
+| Probe | Proposito | Si falla... |
+|---|---|---|
+| **readinessProbe** | "Esta listo para recibir trafico?" | K8s deja de enviarle trafico pero NO lo mata |
+| **livenessProbe** | "Esta vivo?" | K8s lo **mata y reinicia** |
+| **startupProbe** | "Ya termino de arrancar?" | Desactiva los otros probes hasta que pase |
+
+---
+
+### 17.9 Resumen: Pipeline Build #22 a #32
+
+| Build | Error | Causa Raiz | Fix |
+|-------|-------|------------|-----|
+| #22 | `namespace already exists` | Helm + --create-namespace conflicto | Pre-crear namespace con labels Helm |
+| #23 | `invalid ownership metadata` | Namespace sin labels de Helm | kubectl label + annotate |
+| #24 | `namespace already exists` | Namespace residual del build anterior | kubectl delete namespace previo al deploy |
+| #25 | Kafka CrashLoopBackOff | K8s inyecta `KAFKA_PORT` que cp-kafka malinterpreta | `enableServiceLinks: false` |
+| #26 | Schema validation: missing table | Flyway autoconfig no funciona en SB 4.0.3 | `ddl-auto: update` via env var |
+| #27 | Schema validation: missing table | Flyway config explícita tampoco funciona | Confirmo que el fix requiere Helm (no solo application.yml) |
+| #28 | Exit code 137 (OOMKilled) | 512Mi limit, cluster al 128% RAM | JAVA_TOOL_OPTIONS + reducir limits a 300Mi |
+| #29 | Exit code 137 (OOMKilled) | Limits de DB tambien a 512Mi | Reducir DB limits a 256Mi |
+| #30 | Helm --wait colgado 5h | Cluster sobrecargado, pods en restart lento | Abortado; fix de recursos en build #31 |
+| #31 | `no matching resources found` | kubectl wait usa label incorrecto | Cambiar a `app=service-name` |
+| **#32** | **EXITO** | **Todos los fixes aplicados** | **Pipeline completo en 8.8 minutos** |
+
+---
+
+## 18. Glosario
 
 | Termino | Definicion |
 |---|---|
