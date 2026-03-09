@@ -21,7 +21,8 @@
 13. [Troubleshooting](#13-troubleshooting)
 14. [Plugins de Jenkins para Visualizar Stages](#14-plugins-de-jenkins-para-visualizar-stages)
 15. [Jenkins Remoto (Servidor en AWS/Cloud)](#15-jenkins-remoto-servidor-en-awscloud)
-16. [Glosario](#16-glosario)
+16. [Como se Conecta Jenkins con Kubernetes](#16-como-se-conecta-jenkins-con-kubernetes)
+17. [Glosario](#17-glosario)
 
 ---
 
@@ -1521,7 +1522,122 @@ Si todos muestran su version sin error, el pipeline deberia funcionar completo.
 
 ---
 
-## 16. Glosario
+## 16. Como se Conecta Jenkins con Kubernetes
+
+### Arquitectura de la conexion (entorno local)
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Tu maquina (Windows / macOS / Linux)                    │
+│                                                          │
+│  ┌──────────────┐    ┌───────────────────────────────┐   │
+│  │  Jenkins      │    │  Docker Desktop                │   │
+│  │  (localhost:  │    │  ┌──────────────────────────┐  │   │
+│  │   9090)       │    │  │  Kubernetes cluster       │  │   │
+│  │               │────│──│  (single-node)            │  │   │
+│  │  Ejecuta:     │    │  │                            │  │   │
+│  │  - kubectl    │    │  │  Pods: DBs, Kafka,        │  │   │
+│  │  - helm       │    │  │  microservices, gateway    │  │   │
+│  │  - docker     │    │  └──────────────────────────┘  │   │
+│  └──────────────┘    └───────────────────────────────┘   │
+└──────────────────────────────────────────────────────────┘
+```
+
+### El archivo kubeconfig es la clave
+
+Cuando ejecutas `kubectl` o `helm`, estos comandos leen el archivo `~/.kube/config` para saber:
+
+- **Donde** esta el cluster → `https://kubernetes.docker.internal:6443` (API server)
+- **Como** autenticarse → certificados client TLS (autenticacion mutua)
+- **Que contexto** usar → `docker-desktop`
+
+```yaml
+# Ejemplo simplificado de ~/.kube/config
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://kubernetes.docker.internal:6443   # API server de K8s
+    certificate-authority-data: LS0tLS1...             # Certificado TLS
+  name: docker-desktop
+contexts:
+- context:
+    cluster: docker-desktop
+    user: docker-desktop
+  name: docker-desktop
+current-context: docker-desktop
+users:
+- name: docker-desktop
+  user:
+    client-certificate-data: LS0tLS1...  # Certificado del cliente
+    client-key-data: LS0tLS1...          # Clave privada del cliente
+```
+
+### Por que funciona sin configuracion adicional?
+
+Jenkins corre como un proceso Java en tu maquina local. Cuando el pipeline ejecuta `kubectl` o `helm`, estos comandos heredan el mismo kubeconfig que usas tu en la terminal:
+
+- Si tu puedes hacer `kubectl get pods` en tu terminal → Jenkins tambien puede
+- Ambos usan el mismo `~/.kube/config`
+- Ambos se conectan al mismo cluster K8s de Docker Desktop
+
+**No se necesita ningun plugin de Kubernetes en Jenkins.** La conexion es directa via CLI.
+
+### Flujo paso a paso en el pipeline
+
+```
+Jenkins Pipeline
+    │
+    ├─ mvn clean verify           → Compila y testea (Java directo en la maquina)
+    │
+    ├─ docker build               → Construye imagenes Docker
+    │   └─ usa el Docker daemon de Docker Desktop
+    │
+    ├─ kubectl create namespace   → Crea el namespace si no existe
+    │   └─ lee ~/.kube/config → conecta al API Server (localhost:6443)
+    │
+    ├─ helm upgrade --install     → Despliega todos los recursos en K8s
+    │   └─ helm usa kubectl internamente → misma conexion via kubeconfig
+    │
+    ├─ kubectl wait               → Espera que los pods esten listos
+    │
+    └─ bru run                    → Ejecuta tests E2E contra el API Gateway
+        └─ accede via host.docker.internal:NodePort
+```
+
+### Como llegan las imagenes Docker a K8s?
+
+En Docker Desktop, hay un detalle importante: **Docker y K8s comparten el mismo daemon**:
+
+1. Jenkins ejecuta `docker build` → la imagen queda en el daemon local
+2. K8s (que usa el mismo daemon) ya puede ver esas imagenes
+3. Los deployments usan `imagePullPolicy: IfNotPresent` → no intenta descargar de un registry
+4. **No necesitas Docker Hub, ECR, ni ningun registry externo**
+
+Si usas Minikube en lugar de Docker Desktop, el daemon es diferente. Por eso el pipeline tiene un stage "Load Images to K8s" que detecta Minikube y usa `minikube image load` para copiar las imagenes al daemon de Minikube.
+
+### Diferencia con un Jenkins remoto
+
+| Aspecto | Jenkins local | Jenkins remoto (AWS/Cloud) |
+|---|---|---|
+| **kubeconfig** | Viene de Docker Desktop (automatico) | Hay que configurarlo manualmente |
+| **Cluster K8s** | Docker Desktop (single-node) | EKS, GKE, o cluster propio |
+| **Autenticacion** | Certificados TLS locales | ServiceAccount token o IAM role |
+| **Imagenes Docker** | Daemon compartido (no registry) | Necesitas un registry (ECR, Docker Hub) |
+| **Red** | Todo es localhost | VPC, security groups, firewalls |
+
+### Resumen de componentes
+
+| Componente | Funcion | Como se conecta |
+|---|---|---|
+| **Jenkins** | Orquestador del pipeline | Ejecuta CLIs directamente |
+| **kubectl** | CLI para hablar con K8s | Lee `~/.kube/config` → API Server |
+| **helm** | Gestor de releases K8s | Usa kubectl internamente |
+| **docker** | Construye imagenes | Socket `/var/run/docker.sock` |
+| **Docker Desktop K8s** | Cluster local | API en `localhost:6443` |
+
+---
+
+## 17. Glosario
 
 | Termino | Definicion |
 |---|---|

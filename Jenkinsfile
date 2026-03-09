@@ -73,6 +73,9 @@ pipeline {
         stage('Deploy with Helm') {
             steps {
                 sh """
+                    # Ensure namespace exists (idempotent)
+                    kubectl create namespace ${KUBE_NAMESPACE} 2>/dev/null || true
+
                     # Update Helm dependencies
                     helm dependency update ${HELM_CHART} || true
 
@@ -81,7 +84,6 @@ pipeline {
                         -f ${HELM_CHART}/environments/values-e2e.yaml \
                         --set global.imageTag=${env.BUILD_NUMBER} \
                         --namespace ${KUBE_NAMESPACE} \
-                        --create-namespace \
                         --wait \
                         --timeout 8m0s
                 """
