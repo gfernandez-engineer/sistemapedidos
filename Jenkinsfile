@@ -58,43 +58,44 @@ pipeline {
                 script {
                     def services = ['users-service', 'orders-service', 'catalog-service', 'payments-service', 'deliveries-service', 'api-gateway']
                     def imageTag = "${env.BUILD_NUMBER}"
+                    // Shared Trivy cache volume avoids re-downloading the 87MB vuln DB on each scan
+                    def trivyCache = 'trivy-cache'
 
                     sh 'mkdir -p target/trivy-reports'
 
-                    // 1. Trivy filesystem scan: detect CVEs in Maven dependencies (pom.xml / JARs)
-                    echo '=== Trivy Dependency Scan (filesystem) ==='
+                    // Ensure Trivy cache volume exists and pre-download the vulnerability DB once
+                    sh "docker volume create ${trivyCache} || true"
                     sh """
                         docker run --rm \
-                            -v \$(pwd):/project \
-                            -v \$(pwd)/target/trivy-reports:/output \
-                            aquasec/trivy filesystem /project \
-                            --severity ${TRIVY_SEVERITY} \
-                            --scanners vuln \
-                            --format table || true
-                    """
-                    sh """
-                        docker run --rm \
-                            -v \$(pwd):/project \
-                            -v \$(pwd)/target/trivy-reports:/output \
-                            aquasec/trivy filesystem /project \
-                            --severity ${TRIVY_SEVERITY} \
-                            --scanners vuln \
-                            --format json \
-                            --output /output/dependencies.json || true
+                            -v ${trivyCache}:/root/.cache/ \
+                            aquasec/trivy image --download-db-only || true
                     """
 
-                    // 2. Trivy image scan: detect OS and library vulnerabilities in Docker images
+                    // Trivy image scan: detect OS + library vulnerabilities in each Docker image
                     echo '=== Trivy Image Scan ==='
                     services.each { service ->
                         def image = "${IMAGE_REGISTRY}/${service}:${imageTag}"
                         echo "Scanning ${image}..."
-                        sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity ${TRIVY_SEVERITY} --format table ${image} || true"
+                        // Console table output
                         sh """
                             docker run --rm \
                                 -v /var/run/docker.sock:/var/run/docker.sock \
+                                -v ${trivyCache}:/root/.cache/ \
+                                aquasec/trivy image \
+                                --severity ${TRIVY_SEVERITY} \
+                                --skip-db-update \
+                                --format table \
+                                ${image} || true
+                        """
+                        // JSON report for archiving
+                        sh """
+                            docker run --rm \
+                                -v /var/run/docker.sock:/var/run/docker.sock \
+                                -v ${trivyCache}:/root/.cache/ \
                                 -v \$(pwd)/target/trivy-reports:/output \
                                 aquasec/trivy image \
                                 --severity ${TRIVY_SEVERITY} \
+                                --skip-db-update \
                                 --format json \
                                 --output /output/${service}.json \
                                 ${image} || true
