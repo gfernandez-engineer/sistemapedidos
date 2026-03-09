@@ -19,7 +19,9 @@
 11. [Flujo Completo del Pipeline](#11-flujo-completo-del-pipeline)
 12. [Guia Paso a Paso: Levantar Todo](#12-guia-paso-a-paso-levantar-todo)
 13. [Troubleshooting](#13-troubleshooting)
-14. [Glosario](#14-glosario)
+14. [Plugins de Jenkins para Visualizar Stages](#14-plugins-de-jenkins-para-visualizar-stages)
+15. [Jenkins Remoto (Servidor en AWS/Cloud)](#15-jenkins-remoto-servidor-en-awscloud)
+16. [Glosario](#16-glosario)
 
 ---
 
@@ -1346,7 +1348,180 @@ docker-compose up -d --build
 
 ---
 
-## 14. Glosario
+## 14. Plugins de Jenkins para Visualizar Stages
+
+### El problema
+
+Por defecto, Jenkins no muestra la tabla visual de stages (barras de colores con tiempos) en la pagina del job. Necesitas plugins adicionales.
+
+### Plugins necesarios
+
+| Plugin | Para que sirve |
+|---|---|
+| **Pipeline: Stage View** | Tabla visual de stages en la pagina del job |
+| **Pipeline: REST API** | Dependencia de Stage View (expone datos de stages via API) |
+| **Pipeline: Graph Analysis** | Dependencia de REST API (analiza el grafo del pipeline) |
+
+### Instalacion via UI (Jenkins local o remoto)
+
+1. Ir a **Manage Jenkins > Plugins > Available Plugins**
+2. Buscar **"Pipeline: Stage View"**
+3. Marcarlo e instalar (las dependencias se resuelven automaticamente)
+4. Reiniciar Jenkins
+
+### Instalacion via SSH (servidor remoto sin acceso UI)
+
+```bash
+# Conectar al servidor
+ssh -i "keyJenkinsServerProd.pem" ubuntu@<IP-del-servidor>
+
+# Descargar los 3 plugins en el directorio de plugins de Jenkins
+cd /var/lib/jenkins/plugins
+sudo wget -q https://updates.jenkins.io/latest/pipeline-graph-analysis.hpi
+sudo wget -q https://updates.jenkins.io/latest/pipeline-rest-api.hpi
+sudo wget -q https://updates.jenkins.io/latest/pipeline-stage-view.hpi
+
+# Asignar permisos correctos
+sudo chown jenkins:jenkins pipeline-graph-analysis.hpi pipeline-rest-api.hpi pipeline-stage-view.hpi
+
+# Reiniciar Jenkins para cargar los plugins
+sudo systemctl restart jenkins
+```
+
+> **Nota:** Los stages se visualizan a partir del primer build ejecutado despues de instalar los plugins. Los builds anteriores no muestran la tabla.
+
+---
+
+## 15. Jenkins Remoto (Servidor en AWS/Cloud)
+
+### Diferencia con Jenkins local
+
+| | Jenkins Local | Jenkins Remoto |
+|---|---|---|
+| **Donde corre** | Docker container en tu PC | Servidor Linux (EC2, VM, etc.) |
+| **Herramientas** | Incluidas en el Dockerfile custom | Hay que instalarlas manualmente |
+| **K8s** | Docker Desktop Kubernetes | Cluster externo o instalado en el servidor |
+| **Acceso** | localhost:9090 | IP-publica:8080 |
+
+### Prerequisitos del servidor
+
+El servidor necesita las siguientes herramientas para ejecutar el pipeline completo:
+
+| Herramienta | Version | Para que |
+|---|---|---|
+| **JDK 25** | OpenJDK/Temurin 25 | Compilar los microservicios |
+| **Maven** | 3.9+ | Build del proyecto |
+| **Docker** | 24+ | Construir imagenes de los servicios |
+| **kubectl** | 1.28+ | Deploy a Kubernetes |
+| **Helm** | 3.x | Gestionar charts de K8s |
+| **Node.js** | 20+ | Prerequisito de Bruno CLI |
+| **Bruno CLI** | latest | Tests E2E |
+
+### Instalacion paso a paso (Ubuntu/Debian)
+
+```bash
+# Conectar al servidor via SSH
+ssh -i "keyJenkinsServerProd.pem" ubuntu@<IP-del-servidor>
+
+# ─────────────────────────────────────
+# 1. JDK 25 (Eclipse Temurin)
+# ─────────────────────────────────────
+cd /tmp
+wget https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25%2B7/OpenJDK25U-jdk_x64_linux_hotspot_25_7.tar.gz
+sudo mkdir -p /usr/lib/jvm
+sudo tar -xzf OpenJDK25U-jdk_x64_linux_hotspot_25_7.tar.gz -C /usr/lib/jvm
+sudo update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-25+7/bin/java 100
+sudo update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-25+7/bin/javac 100
+sudo update-alternatives --set java /usr/lib/jvm/jdk-25+7/bin/java
+sudo update-alternatives --set javac /usr/lib/jvm/jdk-25+7/bin/javac
+echo 'JAVA_HOME=/usr/lib/jvm/jdk-25+7' | sudo tee -a /etc/environment
+
+# Alternativa: si el repo de Ubuntu lo tiene
+# sudo apt install -y openjdk-25-jdk
+
+# Verificar
+java -version   # Debe mostrar 25
+javac -version  # Debe mostrar 25
+
+# ─────────────────────────────────────
+# 2. Docker
+# ─────────────────────────────────────
+sudo apt-get update
+sudo apt-get install -y docker.io
+sudo usermod -aG docker jenkins
+sudo systemctl restart jenkins
+
+# Verificar
+docker --version
+
+# ─────────────────────────────────────
+# 3. kubectl
+# ─────────────────────────────────────
+curl -LO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install kubectl /usr/local/bin/
+rm kubectl
+
+# Verificar
+kubectl version --client
+
+# ─────────────────────────────────────
+# 4. Helm 3
+# ─────────────────────────────────────
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# Verificar
+helm version
+
+# ─────────────────────────────────────
+# 5. Node.js + Bruno CLI
+# ─────────────────────────────────────
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+sudo npm install -g @usebruno/cli
+
+# Verificar
+node --version
+bru --version
+
+# ─────────────────────────────────────
+# 6. Reiniciar Jenkins (para tomar todos los cambios)
+# ─────────────────────────────────────
+sudo systemctl restart jenkins
+```
+
+### Configuracion de Kubernetes
+
+Para que el pipeline pueda hacer deploy, el usuario `jenkins` necesita acceso al cluster K8s:
+
+```bash
+# Si el cluster esta en el mismo servidor
+sudo mkdir -p /var/lib/jenkins/.kube
+sudo cp ~/.kube/config /var/lib/jenkins/.kube/config
+sudo chown -R jenkins:jenkins /var/lib/jenkins/.kube
+```
+
+### Verificacion rapida
+
+Despues de instalar todo, verificar desde el servidor:
+
+```bash
+# Cambiar al usuario jenkins para verificar permisos
+sudo -u jenkins bash -c '
+  echo "=== Java ===" && java -version &&
+  echo "=== Maven ===" && mvn -version &&
+  echo "=== Docker ===" && docker --version &&
+  echo "=== kubectl ===" && kubectl version --client &&
+  echo "=== Helm ===" && helm version &&
+  echo "=== Node.js ===" && node --version &&
+  echo "=== Bruno ===" && bru --version
+'
+```
+
+Si todos muestran su version sin error, el pipeline deberia funcionar completo.
+
+---
+
+## 16. Glosario
 
 | Termino | Definicion |
 |---|---|
