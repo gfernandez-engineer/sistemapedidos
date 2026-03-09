@@ -56,12 +56,19 @@ pipeline {
             steps {
                 script {
                     def services = ['users-service', 'orders-service', 'catalog-service', 'payments-service', 'deliveries-service', 'api-gateway']
+                    def imageTag = "${env.BUILD_NUMBER}"
                     def isMinikube = sh(script: 'minikube status 2>/dev/null', returnStatus: true) == 0
+                    def isK3s = sh(script: 'which k3s 2>/dev/null', returnStatus: true) == 0
 
                     if (isMinikube) {
                         echo 'Minikube detected - loading images...'
                         services.each { service ->
                             sh "minikube image load ${IMAGE_REGISTRY}/${service}:latest"
+                        }
+                    } else if (isK3s) {
+                        echo 'K3s detected - importing images to containerd...'
+                        services.each { service ->
+                            sh "docker save ${IMAGE_REGISTRY}/${service}:${imageTag} ${IMAGE_REGISTRY}/${service}:latest | sudo k3s ctr images import -"
                         }
                     } else {
                         echo 'Docker Desktop K8s detected - images already available'
@@ -121,14 +128,16 @@ pipeline {
         stage('E2E Tests - Bruno') {
             steps {
                 script {
-                    // Discover API Gateway NodePort for E2E access from Jenkins container
+                    // Discover API Gateway NodePort
                     def nodePort = sh(
-                        script: "kubectl get svc -n ${KUBE_NAMESPACE} -l app.kubernetes.io/name=api-gateway -o jsonpath='{.items[0].spec.ports[0].nodePort}'",
+                        script: "kubectl get svc -n ${KUBE_NAMESPACE} -l app=api-gateway -o jsonpath='{.items[0].spec.ports[0].nodePort}'",
                         returnStdout: true
                     ).trim()
 
-                    // From inside Docker container, reach K8s NodePort via host.docker.internal
-                    def gatewayUrl = "http://host.docker.internal:${nodePort}"
+                    // Determine gateway host: Docker container uses host.docker.internal, native Jenkins uses localhost
+                    def isDockerized = sh(script: 'test -f /.dockerenv', returnStatus: true) == 0
+                    def gatewayHost = isDockerized ? 'host.docker.internal' : 'localhost'
+                    def gatewayUrl = "http://${gatewayHost}:${nodePort}"
                     echo "API Gateway URL for E2E: ${gatewayUrl}"
 
                     // Create dynamic Bruno environment for Jenkins
