@@ -18,7 +18,7 @@ ALL_HEALTHY=true
 
 for NAME in "${SERVICES[@]}"; do
     echo -n "Checking ${NAME}... "
-    POD=$(kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=${NAME} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    POD=$(kubectl get pods -n ${NAMESPACE} -l app=${NAME} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
     if [ -z "${POD}" ]; then
         echo "NO POD FOUND"

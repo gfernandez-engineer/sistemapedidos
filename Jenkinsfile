@@ -104,12 +104,12 @@ pipeline {
                     kubectl wait --for=condition=ready pod -l app=kafka -n ${KUBE_NAMESPACE} --timeout=120s || true
 
                     echo 'Waiting for microservice pods...'
-                    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=users-service -n ${KUBE_NAMESPACE} --timeout=180s
-                    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=orders-service -n ${KUBE_NAMESPACE} --timeout=180s
-                    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=catalog-service -n ${KUBE_NAMESPACE} --timeout=180s
-                    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=payments-service -n ${KUBE_NAMESPACE} --timeout=180s
-                    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=deliveries-service -n ${KUBE_NAMESPACE} --timeout=180s
-                    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=api-gateway -n ${KUBE_NAMESPACE} --timeout=180s
+                    kubectl wait --for=condition=ready pod -l app=users-service -n ${KUBE_NAMESPACE} --timeout=180s
+                    kubectl wait --for=condition=ready pod -l app=orders-service -n ${KUBE_NAMESPACE} --timeout=180s
+                    kubectl wait --for=condition=ready pod -l app=catalog-service -n ${KUBE_NAMESPACE} --timeout=180s
+                    kubectl wait --for=condition=ready pod -l app=payments-service -n ${KUBE_NAMESPACE} --timeout=180s
+                    kubectl wait --for=condition=ready pod -l app=deliveries-service -n ${KUBE_NAMESPACE} --timeout=180s
+                    kubectl wait --for=condition=ready pod -l app=api-gateway -n ${KUBE_NAMESPACE} --timeout=180s
 
                     echo 'All pods ready.'
                 """
