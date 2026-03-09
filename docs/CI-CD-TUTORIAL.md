@@ -23,7 +23,8 @@
 15. [Jenkins Remoto (Servidor en AWS/Cloud)](#15-jenkins-remoto-servidor-en-awscloud)
 16. [Como se Conecta Jenkins con Kubernetes](#16-como-se-conecta-jenkins-con-kubernetes)
 17. [Lecciones del Pipeline: Problemas Reales y Soluciones](#17-lecciones-del-pipeline-problemas-reales-y-soluciones)
-18. [Glosario](#18-glosario)
+18. [Security Scan: Escaneo de Vulnerabilidades con Trivy](#18-security-scan-escaneo-de-vulnerabilidades-con-trivy)
+19. [Glosario](#19-glosario)
 
 ---
 
@@ -1959,7 +1960,185 @@ Con estos valores, K8s no mata un pod hasta `120 + 30*3 = 210s` (3.5 minutos), s
 
 ---
 
-## 18. Glosario
+## 18. Security Scan: Escaneo de Vulnerabilidades con Trivy
+
+### 18.1 Que es Trivy y por que lo usamos
+
+**Trivy** (de Aqua Security) es un scanner de vulnerabilidades open-source que analiza:
+- **Imagenes Docker**: detecta CVEs en paquetes del OS (Ubuntu, Alpine) y librerias de aplicacion (JARs, npm, pip)
+- **Filesystem**: escanea `pom.xml`, `package.json`, etc. buscando dependencias con CVEs conocidos
+- **Secretos**: busca API keys, passwords, tokens hardcodeados en el codigo
+
+**Por que Trivy y no OWASP Dependency-Check:**
+
+| Criterio | OWASP Dependency-Check | Trivy |
+|----------|----------------------|-------|
+| Base de datos | NVD (336K+ registros, ~1hr sin API key) | Propia (~87MB, ~20 seg descarga) |
+| Escanea imagenes Docker | No | Si (OS + librerias) |
+| Escanea Java JARs | Si | Si |
+| Velocidad | Lento (~30-60 min primera vez) | Rapido (~30 seg con cache) |
+| Requiere API key | Recomendado (NVD) | No |
+
+Se eligio Trivy porque es mas rapido, no requiere API key, y puede escanear tanto las dependencias Maven como la imagen Docker completa (incluyendo el OS base).
+
+### 18.2 Arquitectura del Security Scan en el Pipeline
+
+```
+Pipeline Stage: Security Scan
+├── 1. Pre-download DBs (una sola vez, cacheadas en Docker volume)
+│   ├── trivy-db (87MB) - Base de datos de vulnerabilidades
+│   └── trivy-java-db (~300MB) - DB especializada para JARs
+│
+├── 2. Image Scan x6 servicios
+│   ├── users-service      → table (consola) + JSON (artifact)
+│   ├── orders-service     → table (consola) + JSON (artifact)
+│   ├── catalog-service    → table (consola) + JSON (artifact)
+│   ├── payments-service   → table (consola) + JSON (artifact)
+│   ├── deliveries-service → table (consola) + JSON (artifact)
+│   └── api-gateway        → table (consola) + JSON (artifact)
+│
+└── 3. Archive artifacts → target/trivy-reports/*.json
+```
+
+### 18.3 Configuracion en el Jenkinsfile
+
+El stage se ubica **despues de Build Docker Images** y **antes de Load Images to K8s**:
+
+```groovy
+environment {
+    // ...
+    TRIVY_SEVERITY = 'CRITICAL,HIGH'  // Solo reportar HIGH y CRITICAL
+}
+
+stage('Security Scan') {
+    steps {
+        script {
+            def services = ['users-service', 'orders-service', ...]
+            def imageTag = "${env.BUILD_NUMBER}"
+            def trivyCache = 'trivy-cache'  // Docker volume persistente
+
+            sh 'mkdir -p target/trivy-reports'
+
+            // Pre-descargar DBs en volumen compartido (solo descarga si no existen)
+            sh "docker volume create ${trivyCache} || true"
+            sh """
+                docker run --rm -v ${trivyCache}:/root/.cache/ \
+                    aquasec/trivy image --download-db-only
+                docker run --rm -v ${trivyCache}:/root/.cache/ \
+                    aquasec/trivy image --download-java-db-only
+            """
+
+            // Escanear cada imagen
+            services.each { service ->
+                def image = "${IMAGE_REGISTRY}/${service}:${imageTag}"
+                // Tabla en consola
+                sh "docker run --rm \
+                    -v /var/run/docker.sock:/var/run/docker.sock \
+                    -v ${trivyCache}:/root/.cache/ \
+                    aquasec/trivy image --severity ${TRIVY_SEVERITY} \
+                    --format table ${image} || true"
+                // JSON para archivo
+                sh "docker run --rm \
+                    -v /var/run/docker.sock:/var/run/docker.sock \
+                    -v ${trivyCache}:/root/.cache/ \
+                    -v \$(pwd)/target/trivy-reports:/output \
+                    aquasec/trivy image --severity ${TRIVY_SEVERITY} \
+                    --format json --output /output/${service}.json \
+                    ${image} || true"
+            }
+        }
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: 'target/trivy-reports/*.json', allowEmptyArchive: true
+        }
+    }
+}
+```
+
+**Puntos clave de la configuracion:**
+
+1. **`TRIVY_SEVERITY = 'CRITICAL,HIGH'`**: Filtra solo vulnerabilidades serias. MEDIUM y LOW se ignoran para no generar ruido.
+
+2. **`trivyCache` (Docker volume)**: La DB de Trivy (87MB vuln + 300MB Java) se descarga una vez y se reutiliza en builds futuros. Sin esto, cada scan tardaria ~5 min descargando.
+
+3. **`|| true` al final de cada scan**: El stage es **informativo, no bloqueante**. Si Trivy encuentra vulnerabilidades, las reporta pero no falla el build. Esto es configurable - para forzar el fallo se puede usar `--exit-code 1`.
+
+4. **Dos formatos de salida por imagen**:
+   - `--format table`: Salida legible en la consola de Jenkins
+   - `--format json`: Reporte detallado archivado como artifact del build
+
+5. **Montaje de Docker socket** (`-v /var/run/docker.sock`): Trivy corre en un container pero necesita acceso al daemon Docker para inspeccionar las imagenes locales.
+
+### 18.4 Volumenes Docker requeridos
+
+```
+docker volume create trivy-cache
+```
+
+Este volumen persiste entre builds y contiene:
+- `/root/.cache/trivy/db/` - Base de datos de vulnerabilidades (87MB)
+- `/root/.cache/trivy/java-db/` - Base de datos Java (300MB)
+
+Se actualiza automaticamente cuando Trivy detecta que hay una version mas reciente disponible.
+
+### 18.5 Resultados del primer escaneo (Build #38)
+
+**OS Layer (Ubuntu 24.04)**: 0 vulnerabilidades - La imagen base `eclipse-temurin:25-jre` sobre Ubuntu 24.04 esta limpia.
+
+**Java Dependencies**: 5 vulnerabilidades HIGH identicas en los 6 servicios:
+
+| Library | CVE | Severity | Version | Fix | Descripcion |
+|---------|-----|----------|---------|-----|-------------|
+| `jackson-core` (2.x) | GHSA-72hv-8253-57qq | HIGH | 2.20.2 | 2.21.1 | Bypass de limite en Async Parser → DoS |
+| `lz4-java` | CVE-2025-12183 | HIGH | 1.8.0 | 1.8.1 | Out-of-bounds memory → DoS + info leak |
+| `lz4-java` | CVE-2025-66566 | HIGH | 1.8.0 | - | Information Disclosure por buffer sin limpiar |
+| `jackson-core` (3.x) | CVE-2026-29062 | HIGH | 3.0.4 | 3.1.0 | DoS por JSON nesting excesivo |
+| `jackson-core` (3.x) | GHSA-72hv-8253-57qq | HIGH | 3.0.4 | 3.1.0 | Bypass de limite en Async Parser → DoS |
+
+**Analisis**: Las vulnerabilidades son de tipo DoS (Denial of Service), no permiten ejecucion remota de codigo. Son dependencias transitivas que vienen con Spring Boot 4.0.3. Se resolverian actualizando a Spring Boot 4.0.4+ cuando incluya jackson-core >= 2.21.1 y lz4-java >= 1.8.1.
+
+### 18.6 Mantenimiento de imagenes Docker
+
+Cada build genera 12 imagenes Docker (6 servicios x 2 tags). Para evitar acumulacion de espacio en disco:
+
+```bash
+# Ver cuantas imagenes de food-ordering existen
+docker images | grep food-ordering | wc -l
+
+# Borrar builds viejos (mantener solo el actual, ej: 38)
+docker images --format "{{.Repository}}:{{.Tag}}" \
+  | grep "food-ordering/" \
+  | grep -v ":38$" \
+  | grep -v ":latest$" \
+  | xargs docker rmi
+
+# Limpiar imagenes huerfanas (dangling)
+docker image prune -f
+```
+
+**Recomendacion**: Agregar limpieza automatica al pipeline (en el bloque `post`) o configurar Docker Desktop para limitar el almacenamiento.
+
+### 18.7 Opciones para hacer el scan bloqueante
+
+Si se desea que el pipeline **falle** cuando se encuentren vulnerabilidades criticas:
+
+```groovy
+// Opcion 1: Fallar solo con CRITICAL
+sh "docker run --rm ... aquasec/trivy image --severity CRITICAL --exit-code 1 ${image}"
+
+// Opcion 2: Fallar con CRITICAL o HIGH
+sh "docker run --rm ... aquasec/trivy image --severity CRITICAL,HIGH --exit-code 1 ${image}"
+
+// Opcion 3: Fallar solo si hay vulnerabilidades con fix disponible
+sh "docker run --rm ... aquasec/trivy image --severity CRITICAL,HIGH --exit-code 1 --ignore-unfixed ${image}"
+```
+
+La opcion 3 es la mas practica: solo falla si hay vulnerabilidades que realmente se pueden arreglar actualizando dependencias.
+
+---
+
+## 19. Glosario
 
 | Termino | Definicion |
 |---|---|
@@ -1989,6 +2168,11 @@ Con estos valores, K8s no mata un pod hasta `120 + 30*3 = 210s` (3.5 minutos), s
 | **CI/CD** | Continuous Integration / Continuous Deployment. |
 | **NodePort** | Puerto (30000-32767) que K8s asigna para acceso externo. |
 | **host.docker.internal** | Hostname especial para que contenedores accedan al host. |
+| **Trivy** | Scanner de vulnerabilidades de Aqua Security para imagenes Docker y dependencias. |
+| **CVE** | Common Vulnerabilities and Exposures. Identificador unico de una vulnerabilidad. |
+| **NVD** | National Vulnerability Database. Base de datos del NIST con CVEs. |
+| **GHSA** | GitHub Security Advisory. Aviso de seguridad publicado en GitHub. |
+| **DoS** | Denial of Service. Ataque que busca hacer un servicio inaccesible. |
 
 ---
 
