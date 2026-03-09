@@ -28,47 +28,47 @@ spec:
               service:
                 name: {{ .Release.Name }}-users-service
                 port:
-                  number: {{ dig "users-service" "service" "port" 8081 .Values }}
+                  number: 8081
           - path: /api/v1/orders
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-orders-service
                 port:
-                  number: {{ dig "orders-service" "service" "port" 8082 .Values }}
+                  number: 8082
           - path: /api/v1/restaurants
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-catalog-service
                 port:
-                  number: {{ dig "catalog-service" "service" "port" 8083 .Values }}
+                  number: 8083
           - path: /api/v1/products
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-catalog-service
                 port:
-                  number: {{ dig "catalog-service" "service" "port" 8083 .Values }}
+                  number: 8083
           - path: /api/v1/payments
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-payments-service
                 port:
-                  number: {{ dig "payments-service" "service" "port" 8084 .Values }}
+                  number: 8084
           - path: /api/v1/deliveries
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-deliveries-service
                 port:
-                  number: {{ dig "deliveries-service" "service" "port" 8085 .Values }}
+                  number: 8085
           - path: /api/v1/drivers
             pathType: Prefix
             backend:
               service:
                 name: {{ .Release.Name }}-deliveries-service
                 port:
-                  number: {{ dig "deliveries-service" "service" "port" 8085 .Values }}
+                  number: 8085
 {{- end }}
